@@ -1,4 +1,4 @@
-export type NavigationTab = 'home' | 'about' | 'skills' | 'projects' | 'resume' | 'socials' | 'notes' | 'contact';
+export type NavigationTab = 'home' | 'about' | 'skills' | 'projects' | 'resume' | 'socials' | 'notes' | 'contact' | 'admin';
 
 export interface NoteItem {
   id: string;
@@ -71,4 +71,20 @@ export interface MetricStat {
   value: string;
   icon: string;
   subtext: string;
+}
+
+export interface AppointmentBooking {
+  id?: string;
+  name: string;
+  email: string;
+  phone?: string;
+  company?: string;
+  meeting_type: string;
+  appointment_date: string;
+  appointment_time: string;
+  timezone?: string;
+  notes?: string;
+  status?: string;
+  meeting_link?: string;
+  created_at?: string;
 }

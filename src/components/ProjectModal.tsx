@@ -17,14 +17,16 @@ import {
   Code2,
   ShieldCheck,
   MessageSquare,
+  Edit2,
 } from 'lucide-react';
 
 interface ProjectModalProps {
   project: Project;
   onClose: () => void;
+  onEdit?: () => void;
 }
 
-export const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) => {
+export const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose, onEdit }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'simulator' | 'code' | 'architecture'>('overview');
   const [copiedCode, setCopiedCode] = useState(false);
 
@@ -150,12 +152,24 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) 
             </h2>
           </div>
 
-          <button
-            onClick={onClose}
-            className="p-2 bg-black text-white hover:bg-[#00FF00] hover:text-black border-2 border-black transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {onEdit && (
+              <button
+                onClick={onEdit}
+                className="px-3 py-2 bg-white hover:bg-black hover:text-white border-2 border-black font-mono text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Edit this project"
+              >
+                <Edit2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">EDIT CASE</span>
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-2 bg-black text-white hover:bg-[#00FF00] hover:text-black border-2 border-black transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Modal Navigation Tabs */}

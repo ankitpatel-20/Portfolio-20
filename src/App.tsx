@@ -10,14 +10,23 @@ import { ResumeSection } from './components/ResumeSection';
 import { SocialsSection } from './components/SocialsSection';
 import { NotesSection } from './components/NotesSection';
 import { ContactSection } from './components/ContactSection';
+import { AdminPanelSection } from './components/AdminPanelSection';
 import { RecruiterDrawer } from './components/RecruiterDrawer';
+import { GoogleMeetModal } from './components/GoogleMeetModal';
 import { Footer } from './components/Footer';
 import { Sparkles, Terminal } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<NavigationTab>('home');
   const [recruiterOpen, setRecruiterOpen] = useState(false);
+  const [isMeetOpen, setIsMeetOpen] = useState(false);
+  const [meetInitialTopic, setMeetInitialTopic] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+
+  const handleOpenMeet = (topic?: string) => {
+    setMeetInitialTopic(topic || '');
+    setIsMeetOpen(true);
+  };
 
   const handleSelectProject = (id: string) => {
     setSelectedProjectId(id);
@@ -45,10 +54,11 @@ export default function App() {
         setActiveTab={setActiveTab}
         onOpenRecruiter={() => setRecruiterOpen(true)}
         onToggleTerminal={handleToggleTerminal}
+        onOpenMeet={() => handleOpenMeet()}
       />
 
       {/* Main View Area */}
-      <main className="flex-1 w-full pt-20 relative z-10">
+      <main className="flex-1 w-full pt-20 sm:pt-22 relative z-10">
         {activeTab === 'home' && (
           <HomeSection
             setActiveTab={setActiveTab}
@@ -63,7 +73,12 @@ export default function App() {
         {activeTab === 'resume' && <ResumeSection />}
         {activeTab === 'socials' && <SocialsSection setActiveTab={setActiveTab} />}
         {activeTab === 'notes' && <NotesSection setActiveTab={setActiveTab} />}
-        {activeTab === 'contact' && <ContactSection setActiveTab={setActiveTab} />}
+        {activeTab === 'contact' && (
+          <ContactSection setActiveTab={setActiveTab} onOpenMeet={handleOpenMeet} />
+        )}
+        {activeTab === 'admin' && (
+          <AdminPanelSection setActiveTab={setActiveTab} onOpenMeet={handleOpenMeet} />
+        )}
       </main>
 
       {/* Solid Black Structured Footer */}
@@ -88,6 +103,13 @@ export default function App() {
         onClose={() => setRecruiterOpen(false)}
         onNavigateToTab={setActiveTab}
         onSelectProject={handleSelectProject}
+      />
+
+      {/* Google Meet Manager Modal */}
+      <GoogleMeetModal
+        isOpen={isMeetOpen}
+        onClose={() => setIsMeetOpen(false)}
+        defaultTopic={meetInitialTopic}
       />
     </div>
   );

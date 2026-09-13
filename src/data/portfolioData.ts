@@ -1,8 +1,10 @@
 import { Project, SkillCategory, EducationItem, CertificationItem, MetricStat } from '../types';
+import ankitPhotoUrl from '../assets/images/ankit_id_photo_1788184091357.jpg';
 
 export const PERSONAL_INFO = {
   name: 'Ankit Patel',
   handle: 'ANKIT PATEL',
+  avatarUrl: ankitPhotoUrl,
   status: 'System Online // Status: Exploring Opportunities',
   role: 'BCA Student (Class of 2027)',
   targetRole: 'Aspiring Data Scientist',
@@ -19,6 +21,11 @@ export const PERSONAL_INFO = {
   medium: 'https://medium.com/@ankitpatel',
   leetcode: 'https://leetcode.com/u/ankitpatel-20/',
   discord: 'ankitpatel0126',
+  googleFormUrl: 'https://docs.google.com/forms/d/e/1FAIpQLScatSYWIaxCgyy_vUOzwP7GgqKfOUCzVx3IfiyqMyPop7bTig/viewform?usp=dialog',
+  college: 'Amity University Online',
+  course: 'BCA (Bachelor of Computer Applications)',
+  duration: '2024 - 2027',
+  passingYear: '2027',
   availableFor: 'Internships & Full-Time Junior Data Scientist Roles (2025-2027)',
   aboutStory: `I am a Bachelor of Computer Applications (BCA) student (Class of 2027) with a laser focus on Applied Data Science and Machine Learning. Combining strong algorithmic foundations with statistical rigor, I specialize in translating complex multidimensional datasets into actionable business intelligence.
 

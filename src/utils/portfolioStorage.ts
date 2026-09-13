@@ -1,4 +1,5 @@
-import { PERSONAL_INFO, EDUCATION_HISTORY } from '../data/portfolioData';
+import { PERSONAL_INFO, EDUCATION_HISTORY, PROJECTS as DEFAULT_PROJECTS, CERTIFICATIONS as DEFAULT_CERTIFICATIONS } from '../data/portfolioData';
+import { NoteItem, Project, CertificationItem } from '../types';
 
 export interface SocialLinkItem {
   id: string;
@@ -168,7 +169,7 @@ export const DEFAULT_RESUME_DATA: EditableResumeData = {
   ],
 };
 
-import { NoteItem } from '../types';
+export { DEFAULT_PROJECTS, DEFAULT_CERTIFICATIONS };
 
 export const DEFAULT_NOTES: NoteItem[] = [
   {
@@ -180,7 +181,7 @@ export const DEFAULT_NOTES: NoteItem[] = [
     date: 'Aug 2025',
     isPinned: true,
     isImportant: true,
-    tags: ['Notice', 'Internship', 'Hiring', 'BCA 27'],
+    tags: ['Notice', 'Internship', 'Hiring', 'Data Science'],
     readTime: '1 min read',
   },
   {
@@ -238,6 +239,8 @@ const STORAGE_KEYS = {
   RESUME: 'ankit_portfolio_resume_v2',
   CV_FILE: 'ankit_portfolio_cv_file_v2',
   NOTES: 'ankit_portfolio_notes_v2',
+  PROJECTS: 'ankit_portfolio_projects_v2',
+  CERTIFICATIONS: 'ankit_portfolio_certifications_v2',
 };
 
 // Socials helpers
@@ -327,4 +330,47 @@ export const saveNotes = (notes: NoteItem[]) => {
     console.error('Failed to save notes:', e);
   }
 };
+
+// Projects helpers
+export const loadSavedProjects = (): Project[] => {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEYS.PROJECTS);
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch (e) {
+    console.error('Failed to load saved projects:', e);
+  }
+  return DEFAULT_PROJECTS;
+};
+
+export const saveProjects = (projects: Project[]) => {
+  try {
+    localStorage.setItem(STORAGE_KEYS.PROJECTS, JSON.stringify(projects));
+  } catch (e) {
+    console.error('Failed to save projects:', e);
+  }
+};
+
+// Certifications helpers
+export const loadSavedCertifications = (): CertificationItem[] => {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEYS.CERTIFICATIONS);
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch (e) {
+    console.error('Failed to load saved certifications:', e);
+  }
+  return DEFAULT_CERTIFICATIONS;
+};
+
+export const saveCertifications = (certs: CertificationItem[]) => {
+  try {
+    localStorage.setItem(STORAGE_KEYS.CERTIFICATIONS, JSON.stringify(certs));
+  } catch (e) {
+    console.error('Failed to save certifications:', e);
+  }
+};
+
 

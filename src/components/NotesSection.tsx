@@ -6,6 +6,12 @@ import {
   DEFAULT_NOTES,
 } from '../utils/portfolioStorage';
 import {
+  saveNoteToSupabase,
+  fetchAllNotesFromSupabase,
+  deleteNoteFromSupabase,
+  SUPABASE_PROJECT_ID,
+} from '../lib/supabase';
+import {
   StickyNote,
   Pin,
   AlertCircle,
@@ -28,6 +34,8 @@ import {
   MessageSquare,
   Bookmark,
   Share2,
+  Database,
+  RefreshCw,
 } from 'lucide-react';
 
 interface NotesSectionProps {
@@ -39,6 +47,8 @@ export const NotesSection: React.FC<NotesSectionProps> = ({ setActiveTab }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
 
   // Modal / Editor State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -50,8 +60,39 @@ export const NotesSection: React.FC<NotesSectionProps> = ({ setActiveTab }) => {
   const [formIsPinned, setFormIsPinned] = useState(false);
   const [formIsImportant, setFormIsImportant] = useState(false);
 
+  // Load notes from Supabase or local backup on mount
+  const syncNotesFromCloud = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await fetchAllNotesFromSupabase();
+      if (res.fromSupabase && res.data.length > 0) {
+        const formatted: NoteItem[] = res.data.map((item) => ({
+          id: item.id || `db-${Date.now()}`,
+          title: item.title,
+          category: item.category,
+          content: item.content,
+          date: item.date || new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+          tags: Array.isArray(item.tags) ? item.tags : ['General'],
+          isPinned: item.is_pinned,
+          isImportant: item.is_important,
+          readTime: item.read_time,
+        }));
+        setNotes(formatted);
+        saveNotes(formatted);
+        setSyncStatus('Synced from Supabase database');
+      } else {
+        setNotes(loadSavedNotes());
+      }
+    } catch {
+      setNotes(loadSavedNotes());
+    } finally {
+      setIsSyncing(false);
+      setTimeout(() => setSyncStatus(null), 3500);
+    }
+  };
+
   useEffect(() => {
-    setNotes(loadSavedNotes());
+    syncNotesFromCloud();
   }, []);
 
   const handleOpenNewModal = () => {
@@ -59,7 +100,7 @@ export const NotesSection: React.FC<NotesSectionProps> = ({ setActiveTab }) => {
     setFormTitle('');
     setFormCategory('Thought');
     setFormContent('');
-    setFormTags('Data Science, Python');
+    setFormTags('Data Science, Python, SQL');
     setFormIsPinned(false);
     setFormIsImportant(false);
     setIsModalOpen(true);
@@ -76,7 +117,7 @@ export const NotesSection: React.FC<NotesSectionProps> = ({ setActiveTab }) => {
     setIsModalOpen(true);
   };
 
-  const handleSaveNote = (e: React.FormEvent) => {
+  const handleSaveNote = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formTitle.trim() || !formContent.trim()) return;
 
@@ -85,15 +126,29 @@ export const NotesSection: React.FC<NotesSectionProps> = ({ setActiveTab }) => {
       .map((t) => t.trim())
       .filter(Boolean);
 
-    // Calculate approximate read time
     const words = formContent.trim().split(/\s+/).length;
     const minutes = Math.max(1, Math.ceil(words / 180));
     const readTime = `${minutes} min read`;
 
     const currentDate = new Date().toLocaleDateString('en-US', {
       month: 'short',
+      day: 'numeric',
       year: 'numeric',
     });
+
+    const notePayload = {
+      title: formTitle.trim(),
+      category: formCategory,
+      content: formContent.trim(),
+      date: currentDate,
+      tags: parsedTags.length > 0 ? parsedTags : ['General'],
+      is_pinned: formIsPinned,
+      is_important: formIsImportant,
+      read_time: readTime,
+    };
+
+    // Save to Supabase
+    saveNoteToSupabase(notePayload);
 
     if (editingNote) {
       const updated = notes.map((n) =>
@@ -132,11 +187,12 @@ export const NotesSection: React.FC<NotesSectionProps> = ({ setActiveTab }) => {
     setIsModalOpen(false);
   };
 
-  const handleDeleteNote = (id: string) => {
+  const handleDeleteNote = async (id: string) => {
     if (window.confirm('Delete this note permanently?')) {
       const updated = notes.filter((n) => n.id !== id);
       setNotes(updated);
       saveNotes(updated);
+      deleteNoteFromSupabase(id);
     }
   };
 
@@ -262,7 +318,7 @@ export const NotesSection: React.FC<NotesSectionProps> = ({ setActiveTab }) => {
             </span>
           </div>
           <span className="text-[10px] font-mono font-black px-2 py-0.5 bg-black text-white uppercase border border-black self-start sm:self-auto">
-            LIVE DISPATCH // BCA &apos;27
+            LIVE DISPATCH // DATA SCIENCE & ML
           </span>
         </div>
         <div className="mt-3 text-xs sm:text-sm font-mono text-black font-medium leading-relaxed">

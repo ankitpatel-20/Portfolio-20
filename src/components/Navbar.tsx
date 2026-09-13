@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { NavigationTab } from '../types';
-import { Terminal, Code, Menu, X, Sparkles, User, Briefcase } from 'lucide-react';
+import { Terminal, Code, Menu, X, Sparkles, User, Briefcase, Video } from 'lucide-react';
 
 interface NavbarProps {
   activeTab: NavigationTab;
-  setActiveTab: (tab: NavigationTab) => void;
+  setActiveTab: (tab) => void;
   onOpenRecruiter: () => void;
   onToggleTerminal?: () => void;
+  onOpenMeet?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -14,6 +15,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   setActiveTab,
   onOpenRecruiter,
   onToggleTerminal,
+  onOpenMeet,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -39,22 +41,25 @@ export const Navbar: React.FC<NavbarProps> = ({
       id="main-navbar"
       className="fixed top-0 left-0 w-full z-50 bg-[#FFFFFF]/95 backdrop-blur-md border-b-2 border-black transition-colors"
     >
-      <div className="h-20 max-w-[1280px] mx-auto px-6 sm:px-8 flex items-end justify-between pb-4">
+      <div className="h-20 sm:h-22 max-w-[1280px] mx-auto px-6 sm:px-8 flex items-end justify-between pb-3.5 sm:pb-4">
         {/* Brand with Volume marker */}
         <button
           id="nav-brand-btn"
           onClick={() => handleTabClick('home')}
-          className="flex flex-col text-left group cursor-pointer"
+          className="flex flex-col text-left group cursor-pointer shrink-0"
         >
-          <span className="text-[10px] uppercase tracking-[0.3em] font-bold text-[#52525B]">
-            VOLUME 01 // DATA SCIENCE
-          </span>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-2xl sm:text-3xl font-black tracking-tighter leading-none text-black group-hover:opacity-75 transition-opacity">
-              ANKIT PATEL
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] sm:text-[11px] uppercase tracking-[0.35em] font-black text-[#52525B]">
+              VOLUME 01 // DATA SCIENCE
             </span>
-            <span className="hidden sm:inline-block text-[9px] uppercase font-bold bg-[#00FF00] text-black px-2 py-0.5 border border-black ml-1">
-              BCA '27
+            <span className="hidden sm:inline-block text-[10px] font-mono text-black/40">•</span>
+            <span className="hidden sm:inline-block text-[10px] font-mono font-bold uppercase text-[#52525B] tracking-widest">
+              PORTFOLIO ARCHIVE
+            </span>
+          </div>
+          <div className="flex items-baseline gap-3 mt-1">
+            <span className="text-3xl sm:text-4xl lg:text-[40px] font-black tracking-wide sm:tracking-[0.16em] lg:tracking-[0.22em] leading-none text-black group-hover:opacity-75 transition-opacity whitespace-nowrap">
+              ANKIT PATEL
             </span>
           </div>
         </button>
@@ -97,7 +102,21 @@ export const Navbar: React.FC<NavbarProps> = ({
         </nav>
 
         {/* Right Action Icons & Recruiter Trigger */}
-        <div className="flex items-center gap-3 pb-0.5">
+        <div className="flex items-center gap-2 sm:gap-3 pb-0.5">
+          {/* Google Meet Trigger */}
+          {onOpenMeet && (
+            <button
+              id="nav-google-meet-btn"
+              onClick={onOpenMeet}
+              title="Open Google Meet Space Manager"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 border-2 border-black bg-white hover:bg-[#00FF00] text-black text-[10px] font-mono font-black tracking-wider transition-all shadow-[2px_2px_0px_#000000] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none cursor-pointer"
+            >
+              <Video className="w-3.5 h-3.5 text-[#EA4335]" />
+              <span className="hidden sm:inline">GOOGLE MEET</span>
+              <span className="sm:hidden">MEET</span>
+            </button>
+          )}
+
           {/* Quick Recruiter Badge */}
           <button
             id="nav-recruiter-btn"
@@ -150,6 +169,19 @@ export const Navbar: React.FC<NavbarProps> = ({
             );
           })}
           <div className="pt-2 flex flex-col gap-2">
+            {onOpenMeet && (
+              <button
+                id="mobile-nav-meet-btn"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onOpenMeet();
+                }}
+                className="w-full py-2.5 bg-white text-black text-xs font-mono font-black tracking-widest uppercase border-2 border-black hover:bg-[#00FF00] text-center shadow-[3px_3px_0px_#000000] flex items-center justify-center gap-2"
+              >
+                <Video className="w-4 h-4 text-[#EA4335]" />
+                <span>GOOGLE MEET MANAGER</span>
+              </button>
+            )}
             <button
               onClick={() => {
                 setMobileMenuOpen(false);

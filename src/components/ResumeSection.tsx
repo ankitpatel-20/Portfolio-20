@@ -266,7 +266,7 @@ CERTIFICATIONS:
         {/* Resume Header */}
         <div className="border-b-2 border-black pb-6">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h1 className="text-3xl sm:text-4xl font-black text-black tracking-tight uppercase">
+            <h1 className="text-4xl sm:text-5xl font-black text-black tracking-tight uppercase">
               {resumeData.name}
             </h1>
             <div className="flex items-center gap-2">

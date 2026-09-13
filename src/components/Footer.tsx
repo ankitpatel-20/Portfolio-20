@@ -21,11 +21,11 @@ export const Footer: React.FC<FooterProps> = ({ setActiveTab, onOpenRecruiter })
           <span className="text-[10px] font-mono font-bold uppercase tracking-[0.3em] text-[#00FF00]">
             VOLUME 01 // DATA SCIENCE PORTFOLIO
           </span>
-          <h3 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-white mt-1">
+          <h3 className="text-3xl sm:text-4xl font-black uppercase tracking-tight text-white mt-1">
             ANKIT PATEL
           </h3>
           <p className="text-xs font-mono text-[#A1A1AA] mt-0.5">
-            BCA '27 • Applied Machine Learning, SQL Engineering, & Power BI DAX
+            Applied Machine Learning, SQL Engineering, & Power BI DAX
           </p>
         </div>
 
@@ -84,6 +84,15 @@ export const Footer: React.FC<FooterProps> = ({ setActiveTab, onOpenRecruiter })
             className="hover:text-[#00FF00] transition-colors cursor-pointer"
           >
             [DISPATCH]
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab('admin');
+              scrollToTop();
+            }}
+            className="hover:text-[#00FF00] text-[#00FF00]/80 transition-colors cursor-pointer"
+          >
+            [ADMIN VAULT]
           </button>
           <button
             onClick={onOpenRecruiter}

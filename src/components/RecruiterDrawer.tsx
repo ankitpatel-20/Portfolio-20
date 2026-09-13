@@ -78,9 +78,9 @@ export const RecruiterDrawer: React.FC<RecruiterDrawerProps> = ({
             <div className="flex justify-between items-start">
               <div>
                 <span className="text-[10px] font-mono font-bold uppercase text-[#52525B]">CANDIDATE DOSSIER</span>
-                <h3 className="text-2xl font-black text-black uppercase tracking-tight">ANKIT PATEL</h3>
-                <p className="text-xs font-mono text-black font-bold">
-                  BCA Final Year • Aspiring Data Scientist
+                <h3 className="text-3xl font-black text-black uppercase tracking-tight">ANKIT PATEL</h3>
+                <p className="text-xs font-mono text-black font-bold mt-0.5">
+                  Applied Data Scientist & ML Engineer
                 </p>
               </div>
               <span className="text-xs font-mono font-black px-2.5 py-1 bg-[#00FF00] text-black border border-black">

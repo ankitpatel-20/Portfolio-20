@@ -1,8 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   PERSONAL_INFO,
   EDUCATION_HISTORY,
-  CERTIFICATIONS,
   QUICK_METRICS,
 } from '../data/portfolioData';
 import {
@@ -18,14 +17,20 @@ import {
   Target,
   Sparkles,
   ArrowRight,
+  Edit2,
+  Plus,
 } from 'lucide-react';
-import { NavigationTab } from '../types';
+import { NavigationTab, CertificationItem } from '../types';
+import { loadSavedCertifications, saveCertifications } from '../utils/portfolioStorage';
+import { CertificationEditorModal } from './CertificationEditorModal';
 
 interface AboutSectionProps {
   setActiveTab: (tab: NavigationTab) => void;
 }
 
 export const AboutSection: React.FC<AboutSectionProps> = ({ setActiveTab }) => {
+  const [certifications, setCertifications] = useState<CertificationItem[]>(() => loadSavedCertifications());
+  const [isCertModalOpen, setIsCertModalOpen] = useState(false);
   const pillars = [
     {
       num: '01',
@@ -201,38 +206,73 @@ export const AboutSection: React.FC<AboutSectionProps> = ({ setActiveTab }) => {
 
       {/* Professional Certifications Bar */}
       <div className="relative z-10 bg-[#F9F9F9] border-2 border-black p-6 sm:p-8 shadow-[6px_6px_0px_#000000]">
-        <div className="flex items-center justify-between pb-4 mb-6 border-b-2 border-black">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 mb-6 border-b-2 border-black">
           <div className="flex items-center gap-2">
             <Award className="w-5 h-5 text-black" />
             <h3 className="font-black text-lg text-black uppercase tracking-tight">
               Verified Professional Certifications
             </h3>
           </div>
-          <span className="text-xs font-mono font-bold px-2.5 py-0.5 bg-[#00FF00] text-black border border-black">
-            INDUSTRY CREDENTIALS
-          </span>
+          
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => setIsCertModalOpen(true)}
+              className="px-3 py-1 bg-white hover:bg-black hover:text-white border-2 border-black text-xs font-mono font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-[2px_2px_0px_#000000]"
+              title="Add or edit certifications"
+            >
+              <Edit2 className="w-3.5 h-3.5" />
+              <span>EDIT / ADD CREDENTIALS</span>
+            </button>
+            <span className="text-xs font-mono font-bold px-2.5 py-1 bg-[#00FF00] text-black border border-black hidden sm:inline-block">
+              INDUSTRY CREDENTIALS
+            </span>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {CERTIFICATIONS.map((cert, idx) => (
+          {certifications.map((cert, idx) => (
             <div
               key={idx}
-              className="p-4 bg-white border-2 border-black shadow-[2px_2px_0px_#000000] flex flex-col justify-between"
+              className="p-4 bg-white border-2 border-black shadow-[2px_2px_0px_#000000] flex flex-col justify-between hover:shadow-[4px_4px_0px_#000000] transition-shadow"
             >
               <div>
-                <div className="text-[10px] font-mono font-black text-[#52525B] uppercase mb-1">
-                  {cert.issuer} • {cert.date}
+                <div className="text-[10px] font-mono font-black text-[#52525B] uppercase mb-1 flex items-center justify-between">
+                  <span>{cert.issuer} • {cert.date}</span>
+                  {cert.credentialId && (
+                    <span className="text-[9px] text-[#71717A]">#{cert.credentialId}</span>
+                  )}
                 </div>
                 <h5 className="font-bold text-xs text-black leading-snug">{cert.name}</h5>
               </div>
               <div className="mt-3 pt-2 border-t border-black/10 flex items-center justify-between text-[10px] font-mono text-black font-bold">
-                <span>VERIFIED</span>
-                <CheckCircle2 className="w-3.5 h-3.5 text-[#00AA00]" />
+                <span>{cert.verified ? 'VERIFIED' : 'CREDENTIAL'}</span>
+                {cert.verified ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-[#00AA00]" />
+                ) : (
+                  <span className="w-2 h-2 rounded-full bg-black/40" />
+                )}
               </div>
             </div>
           ))}
+
+          {certifications.length === 0 && (
+            <div className="col-span-full p-8 text-center bg-white border-2 border-dashed border-black/30 font-mono text-xs text-[#52525B]">
+              No certifications listed. Click &quot;EDIT / ADD CREDENTIALS&quot; to add your certificates.
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Certification Editor Modal */}
+      <CertificationEditorModal
+        isOpen={isCertModalOpen}
+        certifications={certifications}
+        onClose={() => setIsCertModalOpen(false)}
+        onSave={(updatedCerts) => {
+          setCertifications(updatedCerts);
+          saveCertifications(updatedCerts);
+        }}
+      />
     </section>
   );
 };
