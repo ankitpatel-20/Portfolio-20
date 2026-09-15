@@ -328,7 +328,7 @@ export function getStoredContacts(): any[] {
 // Recommended SQL setup for Supabase users
 export const SUPABASE_SQL_SETUP_SCRIPT = `-- ==============================================================================
 -- COMPLETE SUPABASE SQL SCHEMA FOR APPOINTMENTS, MESSAGES & DAILY NOTES/NOTICES
--- Project: cwpmbuplxcnkgvdviibm
+-- Cloud Database Schema
 -- ==============================================================================
 
 -- 1. APPOINTMENTS TABLE (Interviews & Meeting Slots)

@@ -23,14 +23,19 @@ import {
 import { NavigationTab, CertificationItem } from '../types';
 import { loadSavedCertifications, saveCertifications } from '../utils/portfolioStorage';
 import { CertificationEditorModal } from './CertificationEditorModal';
+import { useAdminAuth } from '../utils/adminAuth';
+import { AdminAuthModal } from './AdminAuthModal';
+import { Lock, Unlock } from 'lucide-react';
 
 interface AboutSectionProps {
   setActiveTab: (tab: NavigationTab) => void;
 }
 
 export const AboutSection: React.FC<AboutSectionProps> = ({ setActiveTab }) => {
+  const { isAdmin } = useAdminAuth();
   const [certifications, setCertifications] = useState<CertificationItem[]>(() => loadSavedCertifications());
   const [isCertModalOpen, setIsCertModalOpen] = useState(false);
+  const [isAdminAuthModalOpen, setIsAdminAuthModalOpen] = useState(false);
   const pillars = [
     {
       num: '01',
@@ -216,12 +221,31 @@ export const AboutSection: React.FC<AboutSectionProps> = ({ setActiveTab }) => {
           
           <div className="flex items-center gap-2.5">
             <button
-              onClick={() => setIsCertModalOpen(true)}
-              className="px-3 py-1 bg-white hover:bg-black hover:text-white border-2 border-black text-xs font-mono font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-[2px_2px_0px_#000000]"
-              title="Add or edit certifications"
+              onClick={() => {
+                if (isAdmin) {
+                  setIsCertModalOpen(true);
+                } else {
+                  setIsAdminAuthModalOpen(true);
+                }
+              }}
+              className={`px-3 py-1.5 border-2 border-black text-xs font-mono font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-[2px_2px_0px_#000000] ${
+                isAdmin
+                  ? 'bg-[#00FF00] hover:bg-black hover:text-white text-black font-black'
+                  : 'bg-white hover:bg-black hover:text-white text-black'
+              }`}
+              title={isAdmin ? 'Add or edit verified certifications' : 'Admin access required to modify certifications'}
             >
-              <Edit2 className="w-3.5 h-3.5" />
-              <span>EDIT / ADD CREDENTIALS</span>
+              {isAdmin ? (
+                <>
+                  <Edit2 className="w-3.5 h-3.5" />
+                  <span>EDIT / ADD CREDENTIALS</span>
+                </>
+              ) : (
+                <>
+                  <Lock className="w-3.5 h-3.5 text-black" />
+                  <span>ADMIN: EDIT / ADD CREDENTIALS</span>
+                </>
+              )}
             </button>
             <span className="text-xs font-mono font-bold px-2.5 py-1 bg-[#00FF00] text-black border border-black hidden sm:inline-block">
               INDUSTRY CREDENTIALS
@@ -272,6 +296,19 @@ export const AboutSection: React.FC<AboutSectionProps> = ({ setActiveTab }) => {
           setCertifications(updatedCerts);
           saveCertifications(updatedCerts);
         }}
+      />
+
+      {/* Admin Unlock Modal */}
+      <AdminAuthModal
+        isOpen={isAdminAuthModalOpen}
+        onClose={() => setIsAdminAuthModalOpen(false)}
+        onSuccess={() => {
+          setIsAdminAuthModalOpen(false);
+          setIsCertModalOpen(true);
+        }}
+        title="Admin Access Required"
+        actionDescription="Only the verified portfolio administrator (Ankit Patel) can modify, add, or delete verified credentials."
+        onNavigateToAdmin={() => setActiveTab('admin')}
       />
     </section>
   );

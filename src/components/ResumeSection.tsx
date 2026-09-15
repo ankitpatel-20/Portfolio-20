@@ -27,9 +27,16 @@ import {
   FileCheck,
   Eye,
   ExternalLink,
+  Lock,
 } from 'lucide-react';
+import { useAdminAuth } from '../utils/adminAuth';
+import { AdminAuthModal } from './AdminAuthModal';
 
 export const ResumeSection: React.FC = () => {
+  const { isAdmin } = useAdminAuth();
+  const [isAdminAuthModalOpen, setIsAdminAuthModalOpen] = useState(false);
+  const [pendingAdminAction, setPendingAdminAction] = useState<(() => void) | null>(null);
+
   const [copied, setCopied] = useState(false);
   const [jobKeyword, setJobKeyword] = useState('');
   const [matchedKeywords, setMatchedKeywords] = useState<string[]>([]);
@@ -37,6 +44,15 @@ export const ResumeSection: React.FC = () => {
   const [cvFile, setCvFile] = useState<CustomCVFile | null>(loadSavedCVFile());
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isUploaderOpen, setIsUploaderOpen] = useState(false);
+
+  const handleAdminAction = (action: () => void) => {
+    if (isAdmin) {
+      action();
+    } else {
+      setPendingAdminAction(() => action);
+      setIsAdminAuthModalOpen(true);
+    }
+  };
 
   useEffect(() => {
     setResumeData(loadSavedResume());
@@ -163,17 +179,19 @@ CERTIFICATIONS:
         {/* Resume Primary Actions */}
         <div className="flex flex-wrap items-center gap-2.5">
           <button
-            onClick={() => setIsUploaderOpen(true)}
+            onClick={() => handleAdminAction(() => setIsUploaderOpen(true))}
             className="px-3.5 py-2.5 bg-white hover:bg-black hover:text-white border-2 border-black text-xs font-mono font-black text-black flex items-center gap-1.5 transition-all shadow-[2px_2px_0px_#000000] cursor-pointer"
+            title={isAdmin ? 'Manage or upload custom CV document' : 'Requires admin authorization to upload CV'}
           >
-            <Upload className="w-3.5 h-3.5" />
+            {!isAdmin ? <Lock className="w-3.5 h-3.5 text-[#52525B]" /> : <Upload className="w-3.5 h-3.5" />}
             <span>{cvFile ? 'MANAGE CV FILE' : 'UPLOAD CV'}</span>
           </button>
           <button
-            onClick={() => setIsEditorOpen(true)}
+            onClick={() => handleAdminAction(() => setIsEditorOpen(true))}
             className="px-3.5 py-2.5 bg-white hover:bg-black hover:text-white border-2 border-black text-xs font-mono font-black text-black flex items-center gap-1.5 transition-all shadow-[2px_2px_0px_#000000] cursor-pointer"
+            title={isAdmin ? 'Edit candidate dossier data' : 'Requires admin authorization to edit dossier'}
           >
-            <Edit3 className="w-3.5 h-3.5" />
+            {!isAdmin ? <Lock className="w-3.5 h-3.5 text-[#52525B]" /> : <Edit3 className="w-3.5 h-3.5" />}
             <span>EDIT DOSSIER DATA</span>
           </button>
           <button
@@ -204,10 +222,11 @@ CERTIFICATIONS:
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setIsUploaderOpen(true)}
-              className="px-3 py-1.5 bg-[#F9F9F9] hover:bg-black hover:text-white border-2 border-black text-xs font-mono font-bold cursor-pointer"
+              onClick={() => handleAdminAction(() => setIsUploaderOpen(true))}
+              className="px-3 py-1.5 bg-[#F9F9F9] hover:bg-black hover:text-white border-2 border-black text-xs font-mono font-bold flex items-center gap-1 cursor-pointer"
             >
-              CHANGE / PREVIEW
+              {!isAdmin && <Lock className="w-3 h-3 text-[#52525B]" />}
+              <span>CHANGE / PREVIEW</span>
             </button>
             <button
               onClick={handleDownloadCV}
@@ -282,7 +301,11 @@ CERTIFICATIONS:
             {resumeData.role}
           </p>
           <div className="flex flex-wrap items-center gap-y-1 gap-x-3 text-xs font-mono text-[#52525B] mt-3 font-bold">
-            <span>{resumeData.email}</span>
+            <span>
+              {resumeData.email.toLowerCase().includes('@gmail.com') || resumeData.email.includes('ankitpatel11411')
+                ? 'Direct Contact Form'
+                : resumeData.email}
+            </span>
             <span>/</span>
             <span>{resumeData.location}</span>
             {resumeData.phone && (
@@ -461,6 +484,23 @@ CERTIFICATIONS:
         onClose={() => setIsUploaderOpen(false)}
         cvFile={cvFile}
         onUpdateCV={(file) => setCvFile(file)}
+      />
+
+      {/* Admin Authentication Modal */}
+      <AdminAuthModal
+        isOpen={isAdminAuthModalOpen}
+        onClose={() => {
+          setIsAdminAuthModalOpen(false);
+          setPendingAdminAction(null);
+        }}
+        onSuccess={() => {
+          setIsAdminAuthModalOpen(false);
+          if (pendingAdminAction) {
+            pendingAdminAction();
+            setPendingAdminAction(null);
+          }
+        }}
+        actionDescription="upload a custom CV document or modify candidate dossier information"
       />
     </section>
   );

@@ -9,7 +9,6 @@ import {
   saveNoteToSupabase,
   fetchAllNotesFromSupabase,
   deleteNoteFromSupabase,
-  SUPABASE_PROJECT_ID,
 } from '../lib/supabase';
 import {
   StickyNote,
@@ -17,7 +16,6 @@ import {
   AlertCircle,
   Plus,
   Search,
-  Filter,
   Trash2,
   Edit3,
   Copy,
@@ -32,23 +30,42 @@ import {
   X,
   Save,
   MessageSquare,
-  Bookmark,
-  Share2,
   Database,
   RefreshCw,
+  Lock,
+  Unlock,
+  ShieldCheck,
+  AlertTriangle,
 } from 'lucide-react';
+import { useAdminAuth } from '../utils/adminAuth';
+import { AdminAuthModal } from './AdminAuthModal';
 
 interface NotesSectionProps {
   setActiveTab?: (tab: NavigationTab) => void;
 }
 
 export const NotesSection: React.FC<NotesSectionProps> = ({ setActiveTab }) => {
+  const { isAdmin, logout } = useAdminAuth();
   const [notes, setNotes] = useState<NoteItem[]>(loadSavedNotes());
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Admin Auth Gate Modal State
+  const [isAdminAuthModalOpen, setIsAdminAuthModalOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+  const [authModalTitle, setAuthModalTitle] = useState('Admin Authentication Required');
+  const [authModalDescription, setAuthModalDescription] = useState(
+    'Only portfolio administrator (Ankit Patel) can publish, modify, or delete notes.'
+  );
+
+  // Deletion & Reset Inline Confirmation State
+  const [deletingNoteId, setDeletingNoteId] = useState<string | null>(null);
+  const [isResetConfirming, setIsResetConfirming] = useState(false);
+  const [isModalDeleteConfirming, setIsModalDeleteConfirming] = useState(false);
 
   // Modal / Editor State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -59,6 +76,23 @@ export const NotesSection: React.FC<NotesSectionProps> = ({ setActiveTab }) => {
   const [formTags, setFormTags] = useState('');
   const [formIsPinned, setFormIsPinned] = useState(false);
   const [formIsImportant, setFormIsImportant] = useState(false);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // Helper to ensure admin authorization before executing any write/delete
+  const executeWithAdminAuth = (action: () => void, title?: string, desc?: string) => {
+    if (isAdmin) {
+      action();
+    } else {
+      if (title) setAuthModalTitle(title);
+      if (desc) setAuthModalDescription(desc);
+      setPendingAction(() => action);
+      setIsAdminAuthModalOpen(true);
+    }
+  };
 
   // Load notes from Supabase or local backup on mount
   const syncNotesFromCloud = async () => {
@@ -103,6 +137,7 @@ export const NotesSection: React.FC<NotesSectionProps> = ({ setActiveTab }) => {
     setFormTags('Data Science, Python, SQL');
     setFormIsPinned(false);
     setFormIsImportant(false);
+    setIsModalDeleteConfirming(false);
     setIsModalOpen(true);
   };
 
@@ -114,6 +149,7 @@ export const NotesSection: React.FC<NotesSectionProps> = ({ setActiveTab }) => {
     setFormTags(note.tags.join(', '));
     setFormIsPinned(!!note.isPinned);
     setFormIsImportant(!!note.isImportant);
+    setIsModalDeleteConfirming(false);
     setIsModalOpen(true);
   };
 
@@ -147,8 +183,10 @@ export const NotesSection: React.FC<NotesSectionProps> = ({ setActiveTab }) => {
       read_time: readTime,
     };
 
-    // Save to Supabase
-    saveNoteToSupabase(notePayload);
+    // Save to Supabase (in background)
+    saveNoteToSupabase(notePayload).catch((err) =>
+      console.warn('Supabase save note notice:', err)
+    );
 
     if (editingNote) {
       const updated = notes.map((n) =>
@@ -167,6 +205,7 @@ export const NotesSection: React.FC<NotesSectionProps> = ({ setActiveTab }) => {
       );
       setNotes(updated);
       saveNotes(updated);
+      showToast('Note updated successfully!');
     } else {
       const newNote: NoteItem = {
         id: `note-${Date.now()}`,
@@ -182,26 +221,46 @@ export const NotesSection: React.FC<NotesSectionProps> = ({ setActiveTab }) => {
       const updated = [newNote, ...notes];
       setNotes(updated);
       saveNotes(updated);
+      showToast('New note published successfully!');
     }
 
     setIsModalOpen(false);
   };
 
-  const handleDeleteNote = async (id: string) => {
-    if (window.confirm('Delete this note permanently?')) {
-      const updated = notes.filter((n) => n.id !== id);
-      setNotes(updated);
-      saveNotes(updated);
-      deleteNoteFromSupabase(id);
+  // Reliable, in-UI deletion handler (replaces broken window.confirm)
+  const executeDeleteNote = async (id: string) => {
+    const noteToDelete = notes.find((n) => n.id === id);
+    const updated = notes.filter((n) => n.id !== id);
+    setNotes(updated);
+    saveNotes(updated);
+    setDeletingNoteId(null);
+    setIsModalDeleteConfirming(false);
+    if (editingNote && editingNote.id === id) {
+      setIsModalOpen(false);
+    }
+    showToast(`Note "${noteToDelete?.title ? noteToDelete.title.slice(0, 25) + '...' : 'Item'}" deleted.`);
+
+    // Delete in Supabase
+    try {
+      await deleteNoteFromSupabase(id);
+    } catch (err) {
+      console.warn('Supabase delete error:', err);
     }
   };
 
   const handleTogglePin = (id: string) => {
-    const updated = notes.map((n) =>
-      n.id === id ? { ...n, isPinned: !n.isPinned } : n
+    executeWithAdminAuth(
+      () => {
+        const updated = notes.map((n) =>
+          n.id === id ? { ...n, isPinned: !n.isPinned } : n
+        );
+        setNotes(updated);
+        saveNotes(updated);
+        showToast('Note pin status updated');
+      },
+      'Admin Access Required',
+      'Only the portfolio administrator can pin or unpin notes.'
     );
-    setNotes(updated);
-    saveNotes(updated);
   };
 
   const handleCopyNote = (note: NoteItem) => {
@@ -211,11 +270,11 @@ export const NotesSection: React.FC<NotesSectionProps> = ({ setActiveTab }) => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleResetDefaults = () => {
-    if (window.confirm('Reset all notes and notices to default records?')) {
-      setNotes(DEFAULT_NOTES);
-      saveNotes(DEFAULT_NOTES);
-    }
+  const executeResetDefaults = () => {
+    setNotes(DEFAULT_NOTES);
+    saveNotes(DEFAULT_NOTES);
+    setIsResetConfirming(false);
+    showToast('Reset notes and notices to default records.');
   };
 
   const handleExportMarkdown = () => {
@@ -226,117 +285,202 @@ export const NotesSection: React.FC<NotesSectionProps> = ({ setActiveTab }) => {
       )
       .join('\n');
 
-    const blob = new Blob([mdContent], { type: 'text/markdown;charset=utf-8;' });
+    const blob = new Blob([mdContent], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `Ankit_Patel_Thoughts_Notices_${new Date().toISOString().slice(0, 10)}.md`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ankit_patel_notes_export_${new Date().toISOString().split('T')[0]}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('Exported notes as Markdown.');
   };
 
-  // Filter & Search
-  const filteredNotes = notes.filter((note) => {
+  // Filter & Search Logic
+  const filteredNotes = notes.filter((n) => {
+    const matchesCategory =
+      selectedCategory === 'ALL' ||
+      (selectedCategory === 'NOTICES' && (n.category === 'Notice' || n.isImportant)) ||
+      n.category.toUpperCase() === selectedCategory;
+
+    const query = searchQuery.toLowerCase();
     const matchesSearch =
-      searchQuery.trim() === '' ||
-      note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      note.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      note.tags.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase()));
+      n.title.toLowerCase().includes(query) ||
+      n.content.toLowerCase().includes(query) ||
+      n.tags.some((t) => t.toLowerCase().includes(query));
 
-    if (!matchesSearch) return false;
-
-    if (selectedCategory === 'ALL') return true;
-    if (selectedCategory === 'PINNED') return !!note.isPinned;
-    if (selectedCategory === 'NOTICES') return note.category === 'Notice' || !!note.isImportant;
-    if (selectedCategory === 'THOUGHTS') return note.category === 'Thought';
-    if (selectedCategory === 'RESEARCH') return note.category === 'Research';
-    if (selectedCategory === 'LEARNING') return note.category === 'Learning';
-
-    return true;
+    return matchesCategory && matchesSearch;
   });
 
-  // Sort: Pinned first, then by date / creation
+  // Pinned items first, then important notices, then newest
   const sortedNotes = [...filteredNotes].sort((a, b) => {
     if (a.isPinned && !b.isPinned) return -1;
     if (!a.isPinned && b.isPinned) return 1;
+    if (a.isImportant && !b.isImportant) return -1;
+    if (!a.isImportant && b.isImportant) return 1;
     return 0;
   });
 
-  const noticesCount = notes.filter((n) => n.category === 'Notice' || n.isImportant).length;
-
   return (
-    <section id="notes-screen" className="py-16 px-6 sm:px-12 max-w-[1280px] mx-auto min-h-screen relative">
-      {/* Giant Architectural Watermark */}
-      <div className="absolute top-10 right-10 text-[180px] sm:text-[240px] font-black opacity-[0.03] leading-none select-none pointer-events-none text-black">
-        06
-      </div>
+    <section className="py-20 px-6 sm:px-12 max-w-[1280px] mx-auto min-h-screen relative">
+      {/* Background Accent Grid */}
+      <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none opacity-60" />
 
-      {/* Section Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8 relative z-10 border-b-2 border-black pb-8">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <span className="text-[10px] uppercase tracking-[0.3em] font-black bg-[#00FF00] text-black px-2.5 py-1 border border-black">
-              VOLUME 01 // 06. THOUGHT LOG & BULLETINS
-            </span>
-            <span className="text-xs font-mono font-bold text-[#52525B]">
-              LIVE NOTES & OFFICIAL NOTICES
-            </span>
-          </div>
-          <h2 className="text-4xl sm:text-6xl font-black text-black tracking-tighter uppercase leading-none">
-            Notes & Notices
-          </h2>
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-[#00FF00] border-2 border-black text-black px-4 py-2.5 font-mono text-xs font-black uppercase shadow-[4px_4px_0px_#000000] flex items-center gap-2 animate-fadeIn">
+          <Check className="w-4 h-4" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Admin Privilege Status Banner */}
+      <div className="mb-6 relative z-10 border-2 border-black p-3 bg-white shadow-[4px_4px_0px_#000000] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          {isAdmin ? (
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-[#00FF00] border border-black animate-pulse shrink-0" />
+              <div className="font-mono text-xs">
+                <span className="font-black text-black uppercase">ADMIN ACTIVE (ANKIT PATEL)</span>
+                <span className="text-[#52525B] hidden md:inline ml-2">
+                  • Full authoring, editing & deletion privileges enabled
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Lock className="w-3.5 h-3.5 text-[#52525B] shrink-0" />
+              <div className="font-mono text-xs">
+                <span className="font-black text-black uppercase">PUBLIC GUEST VIEW</span>
+                <span className="text-[#52525B] hidden md:inline ml-2">
+                  • Verified bulletins & notes. Portfolio modification restricted to Administrator
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Header Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+          {isAdmin ? (
+            <button
+              onClick={logout}
+              className="px-2.5 py-1 bg-[#F4F4F5] hover:bg-black hover:text-white border border-black font-mono text-[11px] font-bold uppercase transition-colors cursor-pointer"
+              title="Lock Admin Mode"
+            >
+              [ LOCK / LOGOUT ]
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                setAuthModalTitle('Administrator Unlock');
+                setAuthModalDescription(
+                  'Enter administrator credentials to unlock publishing and portfolio modification.'
+                );
+                setPendingAction(null);
+                setIsAdminAuthModalOpen(true);
+              }}
+              className="px-3 py-1 bg-black hover:bg-[#00FF00] text-white hover:text-black border border-black font-mono text-[11px] font-black uppercase transition-colors flex items-center gap-1.5 cursor-pointer shadow-[2px_2px_0px_#000000]"
+            >
+              <Lock className="w-3 h-3" />
+              <span>UNLOCK ADMIN MODE</span>
+            </button>
+          )}
+
+          {setActiveTab && (
+            <button
+              onClick={() => setActiveTab('admin')}
+              className="px-2.5 py-1 bg-white hover:bg-[#F4F4F5] border border-black font-mono text-[11px] font-bold text-[#52525B] hover:text-black uppercase cursor-pointer"
+            >
+              Admin Panel →
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 pb-6 border-b-2 border-black gap-6 relative z-10">
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="px-2.5 py-1 bg-black text-white text-[11px] font-mono font-black uppercase tracking-wider">
+              SECTION // 06
+            </span>
+            <span className="px-2.5 py-1 bg-[#00FF00] text-black text-[11px] font-mono font-bold uppercase tracking-wider border border-black flex items-center gap-1">
+              <Sparkles className="w-3 h-3" />
+              {notes.length} VERIFIED ENTRIES
+            </span>
+            {isSyncing && (
+              <span className="text-[10px] font-mono text-[#52525B] flex items-center gap-1">
+                <RefreshCw className="w-3 h-3 animate-spin" /> SYNCING...
+              </span>
+            )}
+            {syncStatus && (
+              <span className="text-[10px] font-mono text-[#008800] font-bold">
+                ✓ {syncStatus}
+              </span>
+            )}
+          </div>
+          <h2 className="text-3xl sm:text-5xl font-black text-black tracking-tight uppercase">
+            NOTES &amp; NOTICES
+          </h2>
+          <p className="text-xs sm:text-sm font-mono text-[#52525B] mt-2 max-w-2xl">
+            A real-time bulletin board of engineering discoveries, daily logs, project breakthroughs,
+            and recruitment notices maintained directly by Ankit Patel.
+          </p>
+        </div>
+
+        {/* Top Actions */}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button
-            onClick={handleOpenNewModal}
-            className="px-4 py-2.5 bg-black hover:bg-[#00FF00] hover:text-black text-white border-2 border-black text-xs font-mono font-black uppercase flex items-center gap-2 transition-all shadow-[2px_2px_0px_#000000] cursor-pointer"
+            onClick={syncNotesFromCloud}
+            disabled={isSyncing}
+            className="px-3.5 py-2.5 bg-white hover:bg-[#F4F4F5] border-2 border-black text-xs font-mono font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Refresh notes from Supabase database"
           >
-            <Plus className="w-4 h-4" />
-            <span>WRITE NEW NOTE</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">REFRESH</span>
           </button>
+
           <button
             onClick={handleExportMarkdown}
-            className="px-3.5 py-2.5 bg-white hover:bg-black hover:text-white border-2 border-black text-xs font-mono font-black text-black flex items-center gap-1.5 transition-all shadow-[2px_2px_0px_#000000] cursor-pointer"
-            title="Export all notes to Markdown"
+            className="px-3.5 py-2.5 bg-white hover:bg-black hover:text-white border-2 border-black text-xs font-mono font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Export all notes to Markdown format"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>EXPORT MD</span>
+            <span className="hidden sm:inline">EXPORT MD</span>
+          </button>
+
+          <button
+            onClick={() =>
+              executeWithAdminAuth(
+                handleOpenNewModal,
+                'Admin Authentication Required',
+                'Only portfolio administrator (Ankit Patel) can publish new notes or official bulletins.'
+              )
+            }
+            className={`px-4 py-2.5 border-2 border-black text-xs font-mono font-black uppercase flex items-center gap-2 transition-all shadow-[3px_3px_0px_#000000] cursor-pointer ${
+              isAdmin
+                ? 'bg-[#00FF00] hover:bg-black hover:text-white text-black'
+                : 'bg-black hover:bg-[#00FF00] text-white hover:text-black'
+            }`}
+          >
+            {isAdmin ? <Plus className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+            <span>{isAdmin ? 'WRITE NEW NOTE' : 'ADMIN: WRITE NOTE'}</span>
           </button>
         </div>
       </div>
 
-      {/* Official Notice Announcement Banner */}
-      <div className="bg-[#00FF00]/10 border-2 border-black p-5 sm:p-6 mb-8 shadow-[6px_6px_0px_#000000] relative z-10">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b-2 border-black">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 bg-[#00AA00] rounded-full animate-pulse" />
-            <span className="font-mono text-xs font-black uppercase text-black tracking-wider">
-              PRIMARY CANDIDATE STATUS & NOTICE BOARD ({noticesCount} ACTIVE NOTICES)
-            </span>
-          </div>
-          <span className="text-[10px] font-mono font-black px-2 py-0.5 bg-black text-white uppercase border border-black self-start sm:self-auto">
-            LIVE DISPATCH // DATA SCIENCE & ML
-          </span>
-        </div>
-        <div className="mt-3 text-xs sm:text-sm font-mono text-black font-medium leading-relaxed">
-          <strong>LATEST BROADCAST:</strong> Open for Data Science, Machine Learning, and BI roles across Noida, Delhi NCR, Bangalore, Mumbai, or Remote. All project repositories, benchmarks, and interactive demo simulators are maintained live below.
-        </div>
-      </div>
-
-      {/* Control Bar: Search & Category Filters */}
-      <div className="bg-white border-2 border-black p-4 mb-8 shadow-[4px_4px_0px_#000000] relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Category Pills & Search */}
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 mb-8 relative z-10">
         {/* Category Pills */}
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-2">
           {[
-            { id: 'ALL', label: 'ALL LOGS' },
-            { id: 'PINNED', label: 'PINNED' },
-            { id: 'NOTICES', label: 'NOTICES' },
-            { id: 'THOUGHTS', label: 'THOUGHTS' },
+            { id: 'ALL', label: 'ALL ENTRIES' },
+            { id: 'NOTICES', label: '📢 NOTICES' },
+            { id: 'THOUGHT', label: 'THOUGHTS' },
             { id: 'RESEARCH', label: 'RESEARCH' },
-            { id: 'LEARNING', label: 'LEARNING' },
+            { id: 'LEARNING', label: 'LEARNING & TIL' },
+            { id: 'MILESTONE', label: 'MILESTONES' },
           ].map((cat) => (
             <button
               key={cat.id}
@@ -352,7 +496,7 @@ export const NotesSection: React.FC<NotesSectionProps> = ({ setActiveTab }) => {
           ))}
         </div>
 
-        {/* Search Field */}
+        {/* Search Field & Reset Button */}
         <div className="flex items-center gap-2">
           <div className="relative flex-1 sm:w-64">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#52525B]" />
@@ -373,13 +517,42 @@ export const NotesSection: React.FC<NotesSectionProps> = ({ setActiveTab }) => {
             )}
           </div>
 
-          <button
-            onClick={handleResetDefaults}
-            className="p-2 bg-white hover:bg-red-50 text-[#52525B] hover:text-red-600 border-2 border-black cursor-pointer"
-            title="Reset to default notes"
-          >
-            <RotateCcw className="w-4 h-4" />
-          </button>
+          {/* Reset Defaults with inline confirmation */}
+          {isResetConfirming ? (
+            <div className="flex items-center gap-1.5 bg-red-50 border-2 border-red-600 p-1 animate-fadeIn">
+              <span className="text-[10px] font-mono font-black text-red-700 uppercase px-1">
+                Reset notes?
+              </span>
+              <button
+                type="button"
+                onClick={executeResetDefaults}
+                className="px-2 py-1 bg-red-600 text-white hover:bg-black font-mono text-[10px] font-black uppercase cursor-pointer"
+              >
+                Confirm
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsResetConfirming(false)}
+                className="px-2 py-1 bg-white border border-black font-mono text-[10px] font-bold uppercase cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() =>
+                executeWithAdminAuth(
+                  () => setIsResetConfirming(true),
+                  'Admin Authentication Required',
+                  'Only portfolio administrator (Ankit Patel) can reset notes to default values.'
+                )
+              }
+              className="p-2 bg-white hover:bg-red-50 text-[#52525B] hover:text-red-600 border-2 border-black cursor-pointer"
+              title="Reset to default notes (Admin only)"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -392,7 +565,13 @@ export const NotesSection: React.FC<NotesSectionProps> = ({ setActiveTab }) => {
             Try adjusting your search query or create a new thought/notice.
           </p>
           <button
-            onClick={handleOpenNewModal}
+            onClick={() =>
+              executeWithAdminAuth(
+                handleOpenNewModal,
+                'Admin Authentication Required',
+                'Only portfolio administrator (Ankit Patel) can publish new notes.'
+              )
+            }
             className="px-4 py-2 bg-black text-white hover:bg-[#00FF00] hover:text-black border-2 border-black text-xs font-mono font-black uppercase inline-flex items-center gap-1.5 cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -421,61 +600,56 @@ export const NotesSection: React.FC<NotesSectionProps> = ({ setActiveTab }) => {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span
                         className={`text-[10px] font-mono font-black uppercase px-2 py-0.5 border border-black ${
-                          isNotice
-                            ? 'bg-[#00FF00] text-black'
-                            : 'bg-black text-white'
+                          isNotice ? 'bg-black text-[#00FF00]' : 'bg-white text-black'
                         }`}
                       >
-                        {note.category.toUpperCase()}
+                        {note.category}
                       </span>
 
-                      {note.isPinned && (
-                        <span className="text-[10px] font-mono font-black px-1.5 py-0.5 bg-black text-white border border-black flex items-center gap-1">
-                          <Pin className="w-3 h-3 text-[#00FF00]" />
-                          <span>PINNED</span>
+                      {note.isImportant && (
+                        <span className="text-[10px] font-mono font-black uppercase px-2 py-0.5 bg-red-600 text-white border border-black flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          OFFICIAL NOTICE
                         </span>
                       )}
 
-                      {note.isImportant && (
-                        <span className="text-[10px] font-mono font-black px-1.5 py-0.5 bg-red-600 text-white border border-black flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3" />
-                          <span>IMPORTANT</span>
+                      {note.isPinned && (
+                        <span className="text-[10px] font-mono font-bold text-black flex items-center gap-1">
+                          <Pin className="w-3 h-3 fill-black text-black" />
+                          PINNED
                         </span>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-1.5 text-xs font-mono text-[#52525B]">
+                    <div className="flex items-center gap-2 text-[10px] font-mono text-[#52525B]">
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
-                        <span>{note.date}</span>
+                        {note.date}
                       </span>
                       {note.readTime && (
-                        <>
-                          <span>•</span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            <span>{note.readTime}</span>
-                          </span>
-                        </>
+                        <span className="hidden sm:flex items-center gap-1">
+                          • <Clock className="w-3 h-3" />
+                          {note.readTime}
+                        </span>
                       )}
                     </div>
                   </div>
 
-                  {/* Note Body */}
+                  {/* Body Content */}
                   <div className="p-6">
-                    <h3 className="text-lg sm:text-xl font-black text-black uppercase tracking-tight leading-snug mb-3">
+                    <h3 className="font-black text-lg text-black uppercase tracking-tight mb-3 leading-snug">
                       {note.title}
                     </h3>
-                    <div className="text-xs sm:text-sm text-black font-medium font-mono leading-relaxed whitespace-pre-line">
+                    <p className="text-xs sm:text-sm font-mono text-[#27272A] leading-relaxed whitespace-pre-wrap">
                       {note.content}
-                    </div>
+                    </p>
                   </div>
                 </div>
 
-                {/* Card Footer: Tags & Action Bar */}
-                <div className="p-4 border-t-2 border-black bg-[#F9F9F9] flex flex-wrap items-center justify-between gap-3">
+                {/* Card Footer: Tags & Actions */}
+                <div className="p-4 border-t-2 border-black bg-[#FAFAFA] flex flex-wrap items-center justify-between gap-3">
                   {/* Tags */}
-                  <div className="flex flex-wrap items-center gap-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5 flex-1">
                     {note.tags.map((tag, tIdx) => (
                       <button
                         key={tIdx}
@@ -487,46 +661,92 @@ export const NotesSection: React.FC<NotesSectionProps> = ({ setActiveTab }) => {
                     ))}
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => handleTogglePin(note.id)}
-                      className={`p-1.5 border border-black text-black hover:bg-black hover:text-white transition-colors cursor-pointer ${
-                        note.isPinned ? 'bg-[#00FF00]' : 'bg-white'
-                      }`}
-                      title={note.isPinned ? 'Unpin note' : 'Pin to top'}
-                    >
-                      <Pin className="w-3.5 h-3.5" />
-                    </button>
+                  {/* Actions Bar */}
+                  {deletingNoteId === note.id ? (
+                    /* Inline Deletion Confirmation */
+                    <div className="flex items-center gap-1.5 bg-red-50 border-2 border-red-600 p-1.5 animate-fadeIn shadow-[2px_2px_0px_#DC2626]">
+                      <div className="flex items-center gap-1 text-red-700 font-mono text-[10px] font-black uppercase px-1">
+                        <AlertTriangle className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                        <span>Delete?</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => executeDeleteNote(note.id)}
+                        className="px-2 py-1 bg-red-600 hover:bg-black text-white font-mono text-[10px] font-black uppercase transition-colors cursor-pointer"
+                      >
+                        Yes, Delete
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeletingNoteId(null)}
+                        className="px-2 py-1 bg-white hover:bg-gray-200 border border-black text-black font-mono text-[10px] font-bold uppercase transition-colors cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      {/* Copy note content (available to everyone) */}
+                      <button
+                        onClick={() => handleCopyNote(note)}
+                        className="p-1.5 bg-white border border-black text-black hover:bg-black hover:text-white transition-colors cursor-pointer"
+                        title="Copy note text"
+                      >
+                        {copiedId === note.id ? (
+                          <Check className="w-3.5 h-3.5 text-[#00AA00]" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                      </button>
 
-                    <button
-                      onClick={() => handleCopyNote(note)}
-                      className="p-1.5 bg-white border border-black text-black hover:bg-black hover:text-white transition-colors cursor-pointer"
-                      title="Copy note content"
-                    >
-                      {copiedId === note.id ? (
-                        <Check className="w-3.5 h-3.5 text-[#00AA00]" />
-                      ) : (
-                        <Copy className="w-3.5 h-3.5" />
-                      )}
-                    </button>
+                      {/* Pin Button */}
+                      <button
+                        onClick={() => handleTogglePin(note.id)}
+                        className={`p-1.5 border border-black transition-colors cursor-pointer ${
+                          note.isPinned
+                            ? 'bg-[#00FF00] text-black hover:bg-black hover:text-white'
+                            : 'bg-white text-black hover:bg-black hover:text-white'
+                        }`}
+                        title={
+                          isAdmin
+                            ? note.isPinned ? 'Unpin note' : 'Pin note'
+                            : 'Admin required to pin notes'
+                        }
+                      >
+                        <Pin className="w-3.5 h-3.5" />
+                      </button>
 
-                    <button
-                      onClick={() => handleOpenEditModal(note)}
-                      className="p-1.5 bg-white border border-black text-black hover:bg-black hover:text-white transition-colors cursor-pointer"
-                      title="Edit note"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                    </button>
+                      {/* Edit Button */}
+                      <button
+                        onClick={() =>
+                          executeWithAdminAuth(
+                            () => handleOpenEditModal(note),
+                            'Admin Authentication Required',
+                            'Only the portfolio administrator (Ankit Patel) can edit this note.'
+                          )
+                        }
+                        className="p-1.5 bg-white border border-black text-black hover:bg-black hover:text-white transition-colors cursor-pointer"
+                        title={isAdmin ? 'Edit note' : 'Admin required to edit note'}
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
 
-                    <button
-                      onClick={() => handleDeleteNote(note.id)}
-                      className="p-1.5 bg-white border border-black text-red-600 hover:bg-red-600 hover:text-white transition-colors cursor-pointer"
-                      title="Delete note"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                      {/* Delete Button */}
+                      <button
+                        onClick={() =>
+                          executeWithAdminAuth(
+                            () => setDeletingNoteId(note.id),
+                            'Admin Authentication Required',
+                            'Only the portfolio administrator (Ankit Patel) can delete notes.'
+                          )
+                        }
+                        className="p-1.5 bg-white border border-black text-red-600 hover:bg-red-600 hover:text-white transition-colors cursor-pointer"
+                        title={isAdmin ? 'Delete note' : 'Admin required to delete note'}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </article>
             );
@@ -538,65 +758,57 @@ export const NotesSection: React.FC<NotesSectionProps> = ({ setActiveTab }) => {
       <div className="mt-12 bg-black text-white p-8 border-2 border-black shadow-[8px_8px_0px_#00FF00] flex flex-col sm:flex-row items-center justify-between gap-6 relative z-10">
         <div>
           <span className="text-[10px] font-mono font-black text-[#00FF00] uppercase tracking-widest block mb-1">
-            // COLLABORATIVE INQUIRY & DISCUSSIONS
+            VERIFIED DIRECT PIPELINE
           </span>
-          <h3 className="text-2xl font-black uppercase tracking-tight">
-            Have thoughts or a project discussion?
+          <h3 className="font-black text-xl sm:text-2xl uppercase tracking-tight">
+            Have a note query, technical challenge, or opportunity?
           </h3>
-          <p className="text-xs font-mono text-[#A1A1AA] mt-1 max-w-xl">
-            Directly connect with Ankit to discuss machine learning architectures, tabular data pipelines, or internship opportunities.
+          <p className="text-xs font-mono text-[#A1A1AA] mt-1">
+            Directly connect with Ankit Patel for enterprise data science, machine learning models, or analytics consulting.
           </p>
         </div>
-
-        <button
-          onClick={() => {
-            if (setActiveTab) {
-              setActiveTab('contact');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }
-          }}
-          className="px-6 py-3 bg-[#00FF00] text-black hover:bg-white font-mono text-xs font-black uppercase flex items-center gap-2 shrink-0 transition-all border-2 border-black cursor-pointer shadow-[3px_3px_0px_#FFFFFF]"
-        >
-          <span>SEND DISPATCH</span>
-          <ArrowRight className="w-4 h-4" />
-        </button>
+        {setActiveTab && (
+          <button
+            onClick={() => setActiveTab('contact')}
+            className="px-6 py-3 bg-[#00FF00] hover:bg-white text-black font-mono text-xs font-black uppercase flex items-center gap-2 transition-all shadow-[4px_4px_0px_#FFFFFF] cursor-pointer shrink-0"
+          >
+            <span>TRANSMIT MESSAGE</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
-      {/* Note Creation / Editing Modal */}
+      {/* Note Editor Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 sm:p-6 overflow-y-auto">
-          <div className="bg-white border-4 border-black w-full max-w-2xl flex flex-col shadow-[12px_12px_0px_#000000] animate-fadeIn">
-            {/* Modal Header */}
-            <div className="p-6 border-b-2 border-black flex items-center justify-between bg-[#F9F9F9]">
-              <div>
-                <span className="text-[10px] font-mono font-bold uppercase text-[#52525B]">
-                  BULLETIN & THOUGHT LOG WRITER
-                </span>
-                <h3 className="text-2xl font-black text-black uppercase">
-                  {editingNote ? 'Edit Note / Notice' : 'Write New Thought or Notice'}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-white border-4 border-black w-full max-w-2xl shadow-[8px_8px_0px_#000000] my-8 relative">
+            <div className="p-5 border-b-2 border-black flex items-center justify-between bg-black text-white">
+              <div className="flex items-center gap-2">
+                <StickyNote className="w-5 h-5 text-[#00FF00]" />
+                <h3 className="font-black text-base uppercase tracking-tight">
+                  {editingNote ? 'EDIT NOTE / BROADCAST (ADMIN)' : 'WRITE NOTE / BROADCAST (ADMIN)'}
                 </h3>
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="p-1.5 bg-black text-white hover:bg-[#00FF00] hover:text-black border-2 border-black cursor-pointer"
+                className="p-1 bg-white text-black hover:bg-[#00FF00] border border-black cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Modal Form */}
-            <form onSubmit={handleSaveNote} className="p-6 space-y-4 overflow-y-auto max-h-[75vh]">
+            <form onSubmit={handleSaveNote} className="p-6 space-y-4">
               <div>
                 <label className="block text-xs font-mono font-bold text-black mb-1">
                   TITLE / HEADLINE:
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Why XGBoost beats Neural Nets on Tabular Features..."
+                  required
+                  placeholder="e.g. Daily TIL: Vector embeddings with pgvector on PostgreSQL"
                   value={formTitle}
                   onChange={(e) => setFormTitle(e.target.value)}
                   className="w-full px-3 py-2 bg-white border-2 border-black font-mono text-xs font-bold text-black focus:outline-none"
-                  required
                 />
               </div>
 
@@ -670,26 +882,83 @@ export const NotesSection: React.FC<NotesSectionProps> = ({ setActiveTab }) => {
               </div>
 
               {/* Modal Footer */}
-              <div className="pt-4 border-t-2 border-black flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-white border-2 border-black font-mono text-xs font-bold uppercase cursor-pointer"
-                >
-                  CANCEL
-                </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2 bg-black hover:bg-[#00FF00] hover:text-black text-white border-2 border-black font-mono text-xs font-black uppercase flex items-center gap-2 shadow-[2px_2px_0px_#000000] cursor-pointer"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>{editingNote ? 'UPDATE NOTE' : 'PUBLISH NOTE'}</span>
-                </button>
+              <div className="pt-4 border-t-2 border-black flex flex-wrap items-center justify-between gap-3">
+                {editingNote && (
+                  <div>
+                    {isModalDeleteConfirming ? (
+                      <div className="flex items-center gap-1.5 bg-red-50 border-2 border-red-600 p-1">
+                        <span className="text-[10px] font-mono font-black text-red-700 uppercase">
+                          Delete note?
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => executeDeleteNote(editingNote.id)}
+                          className="px-2 py-1 bg-red-600 text-white font-mono text-[10px] font-black uppercase cursor-pointer"
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsModalDeleteConfirming(false)}
+                          className="px-2 py-1 bg-white border border-black font-mono text-[10px] font-bold uppercase cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setIsModalDeleteConfirming(true)}
+                        className="px-3 py-2 bg-red-50 hover:bg-red-600 hover:text-white border-2 border-red-600 text-red-700 font-mono text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete Note</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2 ml-auto">
+                  <button
+                    type="button"
+                    onClick={() => setIsModalOpen(false)}
+                    className="px-4 py-2 bg-white border-2 border-black font-mono text-xs font-bold uppercase cursor-pointer"
+                  >
+                    CANCEL
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-2 bg-black hover:bg-[#00FF00] hover:text-black text-white border-2 border-black font-mono text-xs font-black uppercase flex items-center gap-2 shadow-[2px_2px_0px_#000000] cursor-pointer"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>{editingNote ? 'UPDATE NOTE' : 'PUBLISH NOTE'}</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      {/* Admin Authentication Gate Modal */}
+      <AdminAuthModal
+        isOpen={isAdminAuthModalOpen}
+        onClose={() => {
+          setIsAdminAuthModalOpen(false);
+          setPendingAction(null);
+        }}
+        onSuccess={() => {
+          setIsAdminAuthModalOpen(false);
+          if (pendingAction) {
+            const action = pendingAction;
+            setPendingAction(null);
+            action();
+          }
+        }}
+        title={authModalTitle}
+        actionDescription={authModalDescription}
+        onNavigateToAdmin={setActiveTab ? () => setActiveTab('admin') : undefined}
+      />
     </section>
   );
 };

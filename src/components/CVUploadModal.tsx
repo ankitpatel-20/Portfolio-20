@@ -32,6 +32,7 @@ export const CVUploadModal: React.FC<CVUploadModalProps> = ({
   const [dragActive, setDragActive] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [isDeleteConfirming, setIsDeleteConfirming] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
@@ -110,10 +111,9 @@ export const CVUploadModal: React.FC<CVUploadModalProps> = ({
   };
 
   const handleDeleteCV = () => {
-    if (window.confirm('Remove uploaded CV file and revert to generated dossier?')) {
-      saveCVFile(null);
-      onUpdateCV(null);
-    }
+    saveCVFile(null);
+    onUpdateCV(null);
+    setIsDeleteConfirming(false);
   };
 
   const handleDownloadCV = () => {
@@ -191,13 +191,33 @@ export const CVUploadModal: React.FC<CVUploadModalProps> = ({
                     <Download className="w-3.5 h-3.5" />
                     <span>DOWNLOAD</span>
                   </button>
-                  <button
-                    onClick={handleDeleteCV}
-                    className="p-2 text-red-600 hover:bg-red-50 border-2 border-red-600 cursor-pointer"
-                    title="Remove file"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  {isDeleteConfirming ? (
+                    <div className="flex items-center gap-1.5 bg-red-50 border-2 border-red-600 p-1">
+                      <span className="text-[10px] font-mono font-black text-red-700 uppercase">
+                        Remove CV?
+                      </span>
+                      <button
+                        onClick={handleDeleteCV}
+                        className="px-2 py-1 bg-red-600 hover:bg-black text-white font-mono text-[10px] font-black uppercase cursor-pointer"
+                      >
+                        Yes
+                      </button>
+                      <button
+                        onClick={() => setIsDeleteConfirming(false)}
+                        className="px-2 py-1 bg-white hover:bg-gray-100 border border-black font-mono text-[10px] font-bold uppercase cursor-pointer"
+                      >
+                        No
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setIsDeleteConfirming(true)}
+                      className="p-2 text-red-600 hover:bg-red-50 border-2 border-red-600 cursor-pointer"
+                      title="Remove file"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
 

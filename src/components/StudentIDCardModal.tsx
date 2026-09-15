@@ -17,7 +17,7 @@ import {
   Minimize2,
 } from 'lucide-react';
 import { PERSONAL_INFO } from '../data/portfolioData';
-import { saveContactMessageToSupabase, SUPABASE_PROJECT_ID } from '../lib/supabase';
+import { saveContactMessageToSupabase } from '../lib/supabase';
 import { ScannerView } from './ScannerView';
 
 interface StudentIDCardModalProps {
@@ -69,7 +69,7 @@ export const StudentIDCardModal: React.FC<StudentIDCardModalProps> = ({ isOpen, 
   };
 
   const handleCopyProfile = () => {
-    const profile = `STUDENT IDENTITY CARD CREDENTIALS:\nName: ANKIT PATEL\nCollege: AMITY UNIVERSITY ONLINE\nCourse: BCA\nDuration: 2024 - 2027\nPassing Year: 2027\nEmail: ankitpatel11411@gmail.com`;
+    const profile = `STUDENT IDENTITY CARD CREDENTIALS:\nName: ANKIT PATEL\nCollege: AMITY UNIVERSITY ONLINE\nCourse: BCA\nDuration: 2024 - 2027\nPassing Year: 2027\nStatus: Verified Enrolled Student`;
     navigator.clipboard.writeText(profile);
     setCopiedData(true);
     setTimeout(() => setCopiedData(false), 2000);
@@ -358,8 +358,8 @@ export const StudentIDCardModal: React.FC<StudentIDCardModalProps> = ({ isOpen, 
                 </div>
 
                 <div className="flex justify-between border-b border-gray-200 pb-1">
-                  <span className="text-[#64748B] font-bold">EMAIL:</span>
-                  <span className="font-black text-black">ankitpatel11411@gmail.com</span>
+                  <span className="text-[#64748B] font-bold">STATUS:</span>
+                  <span className="font-black text-black">Verified Enrolled Student</span>
                 </div>
 
                 <div className="flex justify-between border-b border-gray-200 pb-1">
@@ -444,7 +444,7 @@ export const StudentIDCardModal: React.FC<StudentIDCardModalProps> = ({ isOpen, 
                       <input
                         type="email"
                         required
-                        placeholder="yourname@gmail.com"
+                        placeholder="yourname@domain.com"
                         value={askerEmail}
                         onChange={(e) => setAskerEmail(e.target.value)}
                         className="w-full px-3 py-2 bg-white border-2 border-black font-mono text-xs font-bold focus:bg-[#F9F9F9] focus:outline-none rounded"

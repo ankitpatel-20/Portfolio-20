@@ -24,12 +24,20 @@ import {
   saveProjects,
   DEFAULT_PROJECTS,
 } from '../utils/portfolioStorage';
+import { useAdminAuth } from '../utils/adminAuth';
+import { AdminAuthModal } from './AdminAuthModal';
+import { Lock } from 'lucide-react';
 
 interface ProjectsSectionProps {
   initialSelectedProjectId?: string | null;
+  setActiveTab?: (tab: any) => void;
 }
 
-export const ProjectsSection: React.FC<ProjectsSectionProps> = ({ initialSelectedProjectId }) => {
+export const ProjectsSection: React.FC<ProjectsSectionProps> = ({ initialSelectedProjectId, setActiveTab }) => {
+  const { isAdmin } = useAdminAuth();
+  const [isAdminAuthModalOpen, setIsAdminAuthModalOpen] = useState(false);
+  const [pendingAdminAction, setPendingAdminAction] = useState<(() => void) | null>(null);
+  const [isResetConfirming, setIsResetConfirming] = useState(false);
   const [projects, setProjects] = useState<Project[]>(() => loadSavedProjects());
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -99,11 +107,19 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({ initialSelecte
     showNotification('Project removed from archives');
   };
 
-  const handleResetDefaults = () => {
-    if (window.confirm('Reset all archive projects to initial default data?')) {
-      setProjects(DEFAULT_PROJECTS);
-      saveProjects(DEFAULT_PROJECTS);
-      showNotification('Reset archives to default projects');
+  const executeResetDefaults = () => {
+    setProjects(DEFAULT_PROJECTS);
+    saveProjects(DEFAULT_PROJECTS);
+    setIsResetConfirming(false);
+    showNotification('Reset archives to default projects');
+  };
+
+  const handleAdminProtectedAction = (action: () => void) => {
+    if (isAdmin) {
+      action();
+    } else {
+      setPendingAdminAction(() => action);
+      setIsAdminAuthModalOpen(true);
     }
   };
 
@@ -125,18 +141,40 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({ initialSelecte
           </div>
 
           <div className="flex items-center gap-2">
+            {isResetConfirming ? (
+              <div className="flex items-center gap-1.5 bg-red-50 border-2 border-red-600 p-1 animate-fadeIn">
+                <span className="text-[10px] font-mono font-black text-red-700 uppercase">
+                  Reset Archives?
+                </span>
+                <button
+                  onClick={executeResetDefaults}
+                  className="px-2.5 py-1 bg-red-600 hover:bg-black text-white font-mono text-[10px] font-black uppercase cursor-pointer"
+                >
+                  Yes
+                </button>
+                <button
+                  onClick={() => setIsResetConfirming(false)}
+                  className="px-2.5 py-1 bg-white hover:bg-gray-100 border border-black font-mono text-[10px] font-bold uppercase cursor-pointer"
+                >
+                  No
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => handleAdminProtectedAction(() => setIsResetConfirming(true))}
+                className="px-3 py-1.5 bg-white hover:bg-[#F4F4F5] border-2 border-black text-xs font-mono font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Reset to default projects (Admin only)"
+              >
+                {!isAdmin && <Lock className="w-3 h-3 text-[#52525B]" />}
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">RESET</span>
+              </button>
+            )}
             <button
-              onClick={handleResetDefaults}
-              className="px-3 py-1.5 bg-white hover:bg-[#F4F4F5] border-2 border-black text-xs font-mono font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-              title="Reset to default projects"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">RESET</span>
-            </button>
-            <button
-              onClick={handleOpenAddModal}
+              onClick={() => handleAdminProtectedAction(handleOpenAddModal)}
               className="px-3.5 py-1.5 bg-[#00FF00] hover:bg-black hover:text-white border-2 border-black text-xs font-mono font-black flex items-center gap-1.5 transition-colors cursor-pointer shadow-[2px_2px_0px_#000000]"
             >
+              {!isAdmin && <Lock className="w-3 h-3 text-black" />}
               <Plus className="w-4 h-4" />
               <span>ADD NEW PROJECT</span>
             </button>
@@ -277,10 +315,11 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({ initialSelecte
           <div className="col-span-full p-12 text-center bg-white border-2 border-dashed border-black/30 font-mono text-sm text-[#52525B] space-y-3">
             <p>No archive projects matched your search criteria.</p>
             <button
-              onClick={handleOpenAddModal}
-              className="px-4 py-2 bg-black text-white hover:bg-[#00FF00] hover:text-black border-2 border-black text-xs font-mono font-bold"
+              onClick={() => handleAdminProtectedAction(handleOpenAddModal)}
+              className="px-4 py-2 bg-black text-white hover:bg-[#00FF00] hover:text-black border-2 border-black text-xs font-mono font-bold inline-flex items-center gap-1.5 cursor-pointer"
             >
-              Add Project Under This Category
+              {!isAdmin && <Lock className="w-3 h-3" />}
+              <span>Add Project Under This Category</span>
             </button>
           </div>
         )}
@@ -292,9 +331,11 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({ initialSelecte
           project={selectedProject}
           onClose={() => setSelectedProject(null)}
           onEdit={() => {
-            const proj = selectedProject;
-            setSelectedProject(null);
-            handleOpenEditModal(proj);
+            handleAdminProtectedAction(() => {
+              const proj = selectedProject;
+              setSelectedProject(null);
+              handleOpenEditModal(proj);
+            });
           }}
         />
       )}
@@ -309,6 +350,23 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({ initialSelecte
         }}
         onSave={handleSaveProject}
         onDelete={handleDeleteProject}
+      />
+
+      {/* Admin Authentication Modal */}
+      <AdminAuthModal
+        isOpen={isAdminAuthModalOpen}
+        onClose={() => {
+          setIsAdminAuthModalOpen(false);
+          setPendingAdminAction(null);
+        }}
+        onSuccess={() => {
+          setIsAdminAuthModalOpen(false);
+          if (pendingAdminAction) {
+            pendingAdminAction();
+            setPendingAdminAction(null);
+          }
+        }}
+        actionDescription="add, edit, or delete archived projects"
       />
     </section>
   );

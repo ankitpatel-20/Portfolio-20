@@ -128,7 +128,7 @@ export const DEFAULT_SOCIAL_LINKS: SocialLinkItem[] = [
   {
     id: 'email',
     platform: 'Direct Email',
-    handle: 'ankitpatel11411@gmail.com',
+    handle: 'Official Direct Channel',
     url: 'mailto:ankitpatel11411@gmail.com',
     category: 'Direct',
     icon: 'mail',
@@ -142,7 +142,7 @@ export const DEFAULT_RESUME_DATA: EditableResumeData = {
   badge: "BCA '27",
   role: 'BCA Student • Aspiring Data Scientist',
   location: 'Noida, India / Open to Relocation / Remote',
-  email: 'ankitpatel11411@gmail.com',
+  email: 'Available via Contact Tab',
   phone: '+91 98765 43210',
   cgpa: '8.8 / 10.0 CGPA',
   institution: 'Department of Computer Applications & Information Science',
@@ -248,7 +248,13 @@ export const loadSavedSocials = (): SocialLinkItem[] => {
   try {
     const saved = localStorage.getItem(STORAGE_KEYS.SOCIALS);
     if (saved) {
-      return JSON.parse(saved);
+      const parsed: SocialLinkItem[] = JSON.parse(saved);
+      return parsed.map((item) => {
+        if (item.handle && item.handle.toLowerCase().includes('ankitpatel11411')) {
+          return { ...item, handle: 'Official Direct Channel' };
+        }
+        return item;
+      });
     }
   } catch (e) {
     console.error('Failed to load saved socials:', e);
@@ -269,7 +275,11 @@ export const loadSavedResume = (): EditableResumeData => {
   try {
     const saved = localStorage.getItem(STORAGE_KEYS.RESUME);
     if (saved) {
-      return JSON.parse(saved);
+      const parsed: EditableResumeData = JSON.parse(saved);
+      if (parsed.email && parsed.email.toLowerCase().includes('ankitpatel11411')) {
+        parsed.email = 'Available via Contact Tab';
+      }
+      return parsed;
     }
   } catch (e) {
     console.error('Failed to load saved resume data:', e);

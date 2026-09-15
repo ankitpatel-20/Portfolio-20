@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CertificationItem } from '../types';
 import {
   X,
@@ -10,10 +10,9 @@ import {
   RotateCcw,
   Save,
   Check,
-  Sparkles,
-  ExternalLink,
+  AlertTriangle,
 } from 'lucide-react';
-import { DEFAULT_CERTIFICATIONS } from '../utils/portfolioStorage';
+import { DEFAULT_CERTIFICATIONS, saveCertifications } from '../utils/portfolioStorage';
 
 interface CertificationEditorModalProps {
   certifications: CertificationItem[];
@@ -31,7 +30,16 @@ export const CertificationEditorModal: React.FC<CertificationEditorModalProps> =
   const [certsList, setCertsList] = useState<CertificationItem[]>(initialCerts);
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [isAddingNew, setIsAddingNew] = useState<boolean>(false);
+  const [deletingIdx, setDeletingIdx] = useState<number | null>(null);
+  const [isResetConfirming, setIsResetConfirming] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Synchronize with parent state when modal opens or initialCerts update
+  useEffect(() => {
+    setCertsList(initialCerts);
+    setDeletingIdx(null);
+    setIsResetConfirming(false);
+  }, [initialCerts, isOpen]);
 
   // Form State
   const [formName, setFormName] = useState('');
@@ -50,6 +58,7 @@ export const CertificationEditorModal: React.FC<CertificationEditorModalProps> =
 
   const startAddNew = () => {
     setEditingIdx(null);
+    setDeletingIdx(null);
     setIsAddingNew(true);
     setFormName('');
     setFormIssuer('');
@@ -62,6 +71,7 @@ export const CertificationEditorModal: React.FC<CertificationEditorModalProps> =
   const startEdit = (idx: number) => {
     const cert = certsList[idx];
     setEditingIdx(idx);
+    setDeletingIdx(null);
     setIsAddingNew(false);
     setFormName(cert.name);
     setFormIssuer(cert.issuer);
@@ -108,41 +118,46 @@ export const CertificationEditorModal: React.FC<CertificationEditorModalProps> =
 
     setCertsList(nextCerts);
     onSave(nextCerts);
+    saveCertifications(nextCerts);
     setIsAddingNew(false);
     setEditingIdx(null);
   };
 
-  const handleDelete = (idx: number) => {
-    if (window.confirm(`Are you sure you want to delete "${certsList[idx].name}"?`)) {
-      const nextCerts = certsList.filter((_, i) => i !== idx);
-      setCertsList(nextCerts);
-      onSave(nextCerts);
-      if (editingIdx === idx) {
-        handleCancelForm();
-      }
-      showToast('Certification removed');
+  const executeDelete = (idx: number) => {
+    const certToDelete = certsList[idx];
+    const certName = certToDelete?.name || 'Certification';
+    const nextCerts = certsList.filter((_, i) => i !== idx);
+
+    setCertsList(nextCerts);
+    onSave(nextCerts);
+    saveCertifications(nextCerts);
+    setDeletingIdx(null);
+
+    if (editingIdx === idx) {
+      handleCancelForm();
     }
+    showToast(`Removed "${certName}"`);
   };
 
-  const handleResetDefaults = () => {
-    if (window.confirm('Reset all professional certifications to default records?')) {
-      setCertsList(DEFAULT_CERTIFICATIONS);
-      onSave(DEFAULT_CERTIFICATIONS);
-      handleCancelForm();
-      showToast('Reset to default certifications');
-    }
+  const executeResetDefaults = () => {
+    setCertsList(DEFAULT_CERTIFICATIONS);
+    onSave(DEFAULT_CERTIFICATIONS);
+    saveCertifications(DEFAULT_CERTIFICATIONS);
+    setIsResetConfirming(false);
+    handleCancelForm();
+    showToast('Reset to default certifications');
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/75 backdrop-blur-sm overflow-y-auto">
-      <div className="bg-white border-2 border-black w-full max-w-3xl shadow-[8px_8px_0px_#000000] my-8 relative flex flex-col max-h-[90vh]">
+      <div className="bg-white border-4 border-black w-full max-w-3xl shadow-[8px_8px_0px_#000000] my-8 relative flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="p-5 border-b-2 border-black flex items-center justify-between bg-black text-white shrink-0">
           <div className="flex items-center gap-2.5">
             <Award className="w-5 h-5 text-[#00FF00]" />
             <div>
               <h3 className="font-black text-base sm:text-lg uppercase tracking-tight">
-                Manage Verified Certifications
+                Manage Verified Certifications (Admin)
               </h3>
               <p className="text-[11px] font-mono text-[#A1A1AA]">
                 Add, edit, or remove professional industry credentials
@@ -170,17 +185,41 @@ export const CertificationEditorModal: React.FC<CertificationEditorModalProps> =
           {/* Action Toolbar */}
           <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-black/20">
             <div className="text-xs font-mono font-bold text-[#52525B]">
-              TOTAL CREDENTIALS: <span className="text-black font-black">{certsList.length}</span>
+              ACTIVE CREDENTIALS: <span className="text-black font-black">{certsList.length}</span>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleResetDefaults}
-                className="px-3 py-1.5 bg-[#F4F4F5] hover:bg-black hover:text-white border-2 border-black text-xs font-mono font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>RESET DEFAULTS</span>
-              </button>
+              {isResetConfirming ? (
+                <div className="flex items-center gap-1.5 bg-red-50 border-2 border-red-600 p-1 animate-fadeIn">
+                  <span className="text-[10px] font-mono font-black text-red-700 uppercase px-1">
+                    Reset to defaults?
+                  </span>
+                  <button
+                    type="button"
+                    onClick={executeResetDefaults}
+                    className="px-2 py-1 bg-red-600 hover:bg-black text-white font-mono text-[10px] font-black uppercase transition-colors cursor-pointer"
+                  >
+                    Confirm
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsResetConfirming(false)}
+                    className="px-2 py-1 bg-white hover:bg-gray-200 border border-black font-mono text-[10px] font-bold uppercase transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsResetConfirming(true)}
+                  className="px-3 py-1.5 bg-[#F4F4F5] hover:bg-black hover:text-white border-2 border-black text-xs font-mono font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="Reset to default certifications"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>RESET DEFAULTS</span>
+                </button>
+              )}
+
               {!isAddingNew && editingIdx === null && (
                 <button
                   type="button"
@@ -198,85 +237,81 @@ export const CertificationEditorModal: React.FC<CertificationEditorModalProps> =
           {(isAddingNew || editingIdx !== null) && (
             <form
               onSubmit={handleSaveForm}
-              className="bg-[#F9F9F9] border-2 border-black p-5 space-y-4 shadow-[4px_4px_0px_#000000]"
+              className="bg-[#F9F9F9] border-2 border-black p-5 space-y-4 shadow-[4px_4px_0px_#000000] animate-fadeIn"
             >
-              <div className="flex items-center justify-between border-b border-black/20 pb-2">
-                <span className="text-xs font-mono font-black uppercase text-black">
-                  {isAddingNew ? '★ ADD NEW CREDENTIAL' : `✏ EDIT: ${certsList[editingIdx!].name}`}
+              <div className="flex items-center justify-between border-b-2 border-black pb-2">
+                <span className="font-mono text-xs font-black uppercase text-black">
+                  {isAddingNew ? '+ Add New Certification' : `✏ Edit: ${formName || 'Credential'}`}
                 </span>
-                <button
-                  type="button"
-                  onClick={handleCancelForm}
-                  className="text-xs font-mono font-bold text-[#52525B] hover:text-black"
-                >
-                  CANCEL
-                </button>
+                <span className="text-[10px] font-mono text-[#52525B]">
+                  * Required fields
+                </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="sm:col-span-2">
-                  <label className="block text-[11px] font-mono font-bold text-black uppercase mb-1">
-                    Certification Title *
+                <div>
+                  <label className="block text-[11px] font-mono font-bold uppercase mb-1 text-black">
+                    Certification Name *
                   </label>
                   <input
                     type="text"
                     required
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
-                    placeholder="e.g. AWS Certified Machine Learning Specialty"
+                    placeholder="e.g. Google Data Analytics Professional Certificate"
                     className="w-full px-3 py-2 bg-white border-2 border-black text-xs font-mono font-bold text-black focus:outline-none focus:bg-[#FFFFFF]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-mono font-bold text-black uppercase mb-1">
-                    Issuing Organization *
+                  <label className="block text-[11px] font-mono font-bold uppercase mb-1 text-black">
+                    Issuing Organization / Authority *
                   </label>
                   <input
                     type="text"
                     required
                     value={formIssuer}
                     onChange={(e) => setFormIssuer(e.target.value)}
-                    placeholder="e.g. Amazon Web Services / Stanford / Google"
+                    placeholder="e.g. Google / Coursera / IBM / Microsoft"
                     className="w-full px-3 py-2 bg-white border-2 border-black text-xs font-mono font-bold text-black focus:outline-none focus:bg-[#FFFFFF]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-mono font-bold text-black uppercase mb-1">
-                    Issue Year / Date
+                  <label className="block text-[11px] font-mono font-bold uppercase mb-1 text-black">
+                    Issue Date / Year
                   </label>
                   <input
                     type="text"
                     value={formDate}
                     onChange={(e) => setFormDate(e.target.value)}
-                    placeholder="e.g. 2025"
+                    placeholder="e.g. 2025 or Aug 2025"
                     className="w-full px-3 py-2 bg-white border-2 border-black text-xs font-mono font-bold text-black focus:outline-none focus:bg-[#FFFFFF]"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-mono font-bold text-black uppercase mb-1">
-                    Credential ID / Verification Code
+                  <label className="block text-[11px] font-mono font-bold uppercase mb-1 text-black">
+                    Credential ID / License
                   </label>
                   <input
                     type="text"
                     value={formCredentialId}
                     onChange={(e) => setFormCredentialId(e.target.value)}
-                    placeholder="e.g. AWS-ML-98231"
+                    placeholder="e.g. GOOG-DA-98234 or verify URL"
                     className="w-full px-3 py-2 bg-white border-2 border-black text-xs font-mono font-bold text-black focus:outline-none focus:bg-[#FFFFFF]"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-mono font-bold text-black uppercase mb-1">
-                    Key Skills Covered (Comma Separated)
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-mono font-bold uppercase mb-1 text-black">
+                    Skills Covered (Comma separated)
                   </label>
                   <input
                     type="text"
                     value={formSkills}
                     onChange={(e) => setFormSkills(e.target.value)}
-                    placeholder="e.g. SageMaker, Feature Stores, PyTorch, Cloud ML"
+                    placeholder="e.g. SQL, Tableau, R Programming, Data Cleaning, Python"
                     className="w-full px-3 py-2 bg-white border-2 border-black text-xs font-mono font-bold text-black focus:outline-none focus:bg-[#FFFFFF]"
                   />
                 </div>
@@ -298,21 +333,33 @@ export const CertificationEditorModal: React.FC<CertificationEditorModalProps> =
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-black/20">
-                <button
-                  type="button"
-                  onClick={handleCancelForm}
-                  className="px-4 py-2 border-2 border-black text-xs font-mono font-bold hover:bg-[#E4E4E7]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-black text-white hover:bg-[#00FF00] hover:text-black border-2 border-black text-xs font-mono font-black flex items-center gap-1.5 transition-colors shadow-[2px_2px_0px_#000000]"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>{isAddingNew ? 'Add Credential' : 'Save Changes'}</span>
-                </button>
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-black/20">
+                {editingIdx !== null && (
+                  <button
+                    type="button"
+                    onClick={() => setDeletingIdx(editingIdx)}
+                    className="px-3 py-2 bg-red-50 hover:bg-red-600 hover:text-white border-2 border-red-600 text-red-700 text-xs font-mono font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete this Credential</span>
+                  </button>
+                )}
+                <div className="flex items-center gap-2 ml-auto">
+                  <button
+                    type="button"
+                    onClick={handleCancelForm}
+                    className="px-4 py-2 border-2 border-black text-xs font-mono font-bold hover:bg-[#E4E4E7] cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-black text-white hover:bg-[#00FF00] hover:text-black border-2 border-black text-xs font-mono font-black flex items-center gap-1.5 transition-colors shadow-[2px_2px_0px_#000000] cursor-pointer"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>{isAddingNew ? 'Add Credential' : 'Save Changes'}</span>
+                  </button>
+                </div>
               </div>
             </form>
           )}
@@ -328,7 +375,7 @@ export const CertificationEditorModal: React.FC<CertificationEditorModalProps> =
                 key={idx}
                 className="p-4 bg-white border-2 border-black shadow-[3px_3px_0px_#000000] flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-[#FAFAFA] transition-colors"
               >
-                <div className="space-y-1">
+                <div className="space-y-1 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] font-mono font-black text-black bg-[#F4F4F5] px-1.5 py-0.5 border border-black/40">
                       0{idx + 1}
@@ -360,24 +407,48 @@ export const CertificationEditorModal: React.FC<CertificationEditorModalProps> =
                   )}
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                  <button
-                    type="button"
-                    onClick={() => startEdit(idx)}
-                    className="p-2 bg-white hover:bg-black hover:text-white border-2 border-black text-black transition-colors cursor-pointer shadow-[1px_1px_0px_#000000]"
-                    title="Edit certification"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(idx)}
-                    className="p-2 bg-white hover:bg-red-600 hover:text-white border-2 border-black text-black transition-colors cursor-pointer shadow-[1px_1px_0px_#000000]"
-                    title="Delete certification"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+                {/* Inline Confirmation or Edit/Delete Buttons */}
+                {deletingIdx === idx ? (
+                  <div className="flex items-center gap-2 bg-red-50 border-2 border-red-600 p-2 shrink-0 self-end sm:self-center animate-fadeIn shadow-[2px_2px_0px_#DC2626]">
+                    <div className="flex items-center gap-1 text-red-700 font-mono text-[10px] font-black uppercase">
+                      <AlertTriangle className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                      <span>Delete?</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => executeDelete(idx)}
+                      className="px-2.5 py-1 bg-red-600 hover:bg-black text-white font-mono text-[10px] font-black uppercase transition-colors cursor-pointer"
+                    >
+                      Yes, Delete
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeletingIdx(null)}
+                      className="px-2 py-1 bg-white hover:bg-gray-200 border border-black text-black font-mono text-[10px] font-bold uppercase transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                    <button
+                      type="button"
+                      onClick={() => startEdit(idx)}
+                      className="p-2 bg-white hover:bg-black hover:text-white border-2 border-black text-black transition-colors cursor-pointer shadow-[1px_1px_0px_#000000]"
+                      title="Edit certification"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeletingIdx(idx)}
+                      className="p-2 bg-white hover:bg-red-600 hover:text-white border-2 border-black text-red-600 transition-colors cursor-pointer shadow-[1px_1px_0px_#000000]"
+                      title="Delete certification"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
 
@@ -387,17 +458,6 @@ export const CertificationEditorModal: React.FC<CertificationEditorModalProps> =
               </div>
             )}
           </div>
-        </div>
-
-        {/* Footer */}
-        <div className="p-4 border-t-2 border-black bg-[#F4F4F5] flex justify-end shrink-0">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-5 py-2 bg-black text-white hover:bg-[#00FF00] hover:text-black border-2 border-black font-mono text-xs font-black uppercase transition-colors cursor-pointer shadow-[2px_2px_0px_#000000]"
-          >
-            Done
-          </button>
         </div>
       </div>
     </div>

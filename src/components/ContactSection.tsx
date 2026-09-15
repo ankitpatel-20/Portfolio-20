@@ -29,7 +29,6 @@ import { NavigationTab, AppointmentBooking } from '../types';
 import {
   saveAppointmentToSupabase,
   saveContactMessageToSupabase,
-  SUPABASE_PROJECT_ID,
   SUPABASE_SQL_SETUP_SCRIPT,
   SUPABASE_URL,
 } from '../lib/supabase';
@@ -133,7 +132,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
     { type: 'output', text: 'SYSTEM_CLI v2.5.0 INITIALIZED.' },
     {
       type: 'supabase',
-      text: `[SUPABASE_LINK] Connected to backend project: ${SUPABASE_PROJECT_ID}`,
+      text: `[SUPABASE_LINK] Connected to database backend: Online`,
     },
     { type: 'output', text: 'Type "help", "book", "hire", "skills", or "projects".' },
   ]);
@@ -258,7 +257,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
       case 'supabase':
         newLogs.push({
           type: 'supabase',
-          text: `SUPABASE BACKEND CONFIG:\n  • Project ID: ${SUPABASE_PROJECT_ID}\n  • Endpoint: ${SUPABASE_URL}\n  • Target Table: "appointments" & "contacts"\n  • Status: Online & Integrated`,
+          text: `SUPABASE BACKEND CONFIG:\n  • Target Table: "appointments" & "contacts"\n  • Status: Online & Integrated`,
         });
         break;
       case 'about':
@@ -286,7 +285,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
       case 'hire':
         newLogs.push({
           type: 'output',
-          text: `Status: Available for Data Scientist Internships & Entry-Level roles.\nContact: ${PERSONAL_INFO.email}`,
+          text: `Status: Available for Data Scientist Internships & Entry-Level roles.\nReach out via the contact form or direct scheduling.`,
         });
         break;
       case 'clear':
@@ -342,7 +341,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
               title="View Supabase table schema & project info"
             >
               <Database className="w-3.5 h-3.5 text-[#00AA00]" />
-              <span>SUPABASE: {SUPABASE_PROJECT_ID}</span>
+              <span>SUPABASE: CONNECTED</span>
             </button>
           </div>
         </div>
@@ -459,8 +458,8 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
                         </div>
                       )}
                       <div className="flex justify-between text-[11px] pt-1">
-                        <span className="text-[#52525B]">SUPABASE PROJECT:</span>
-                        <span className="font-black text-black">{SUPABASE_PROJECT_ID}</span>
+                        <span className="text-[#52525B]">DATABASE STATUS:</span>
+                        <span className="font-black text-black">Connected & Verified</span>
                       </div>
                     </div>
 
@@ -691,7 +690,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
 
                       <div className="flex items-center justify-between text-[10px] font-mono text-[#52525B] mt-2 px-1">
                         <span>⚡ AUTOMATIC SUPABASE SYNC</span>
-                        <span>PROJECT: {SUPABASE_PROJECT_ID}</span>
+                        <span>STATUS: CONNECTED</span>
                       </div>
                     </div>
                   </form>
@@ -800,12 +799,12 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
               <div className="p-3 bg-[#F9F9F9] border-2 border-black flex items-center justify-between">
                 <div className="flex items-center gap-2 text-black font-bold truncate">
                   <Mail className="w-3.5 h-3.5 text-black shrink-0" />
-                  <span className="truncate">{PERSONAL_INFO.email}</span>
+                  <span className="truncate">Direct Contact Channel</span>
                 </div>
                 <button
                   onClick={handleCopyEmail}
                   className="text-black hover:text-[#00AA00] p-1 font-bold cursor-pointer"
-                  title="Copy Email"
+                  title="Copy Direct Address"
                 >
                   {copiedEmail ? <Check className="w-3.5 h-3.5 text-[#00AA00]" /> : <Copy className="w-3.5 h-3.5" />}
                 </button>
@@ -893,7 +892,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
                 <Database className="w-5 h-5 text-[#00FF00]" />
                 <div>
                   <h3 className="font-black text-sm uppercase tracking-tight">Supabase Backend Configuration</h3>
-                  <p className="text-[10px] font-mono text-[#A1A1AA]">Project ID: {SUPABASE_PROJECT_ID}</p>
+                  <p className="text-[10px] font-mono text-[#A1A1AA]">Cloud Database Active</p>
                 </div>
               </div>
               <button
@@ -907,8 +906,8 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
             <div className="p-6 overflow-y-auto space-y-4 font-mono text-xs">
               <div className="p-3 bg-[#F4F4F5] border-2 border-black space-y-1">
                 <div className="text-black font-bold flex items-center justify-between">
-                  <span>ENDPOINT:</span>
-                  <span className="text-[#00AA00]">{SUPABASE_URL}</span>
+                  <span>DATABASE:</span>
+                  <span className="text-[#00AA00]">Supabase PostgreSQL (Connected)</span>
                 </div>
                 <div className="text-black font-bold flex items-center justify-between">
                   <span>TARGET TABLES:</span>
@@ -941,7 +940,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
                 <p className="text-[11px] text-[#52525B] mt-2 leading-normal">
                   💡 Tip: If you haven't run the table creation script in your Supabase SQL Editor yet, click <strong>COPY SQL</strong> above and run it in your{' '}
                   <a
-                    href={`https://supabase.com/dashboard/project/${SUPABASE_PROJECT_ID}/sql`}
+                    href="https://supabase.com/dashboard"
                     target="_blank"
                     rel="noreferrer"
                     className="underline text-black font-bold inline-flex items-center gap-0.5"

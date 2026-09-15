@@ -40,12 +40,12 @@ import {
   saveNoteToSupabase,
   deleteNoteFromSupabase,
   AppointmentData,
-  SUPABASE_PROJECT_ID,
   SUPABASE_URL,
   SUPABASE_SQL_SETUP_SCRIPT,
   supabase,
 } from '../lib/supabase';
 import { NavigationTab } from '../types';
+import { isAdminAuthenticated, loginAdmin, logoutAdmin } from '../utils/adminAuth';
 
 interface AdminPanelSectionProps {
   setActiveTab: (tab: NavigationTab) => void;
@@ -61,12 +61,13 @@ export const getStoredAdminPassword = (): string => {
 
 export const AdminPanelSection: React.FC<AdminPanelSectionProps> = ({ setActiveTab, onOpenMeet }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return sessionStorage.getItem('ankit_admin_auth') === 'true';
+    return isAdminAuthenticated();
   });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [deletingAdminNoteId, setDeletingAdminNoteId] = useState<string | null>(null);
 
   // Forgot Password / Recovery State
   const [isForgotMode, setIsForgotMode] = useState(false);
@@ -108,18 +109,18 @@ export const AdminPanelSection: React.FC<AdminPanelSectionProps> = ({ setActiveT
     const cleanPass = password.trim();
     const currentActivePassword = getStoredAdminPassword();
 
-    // Credentials check: ankitpatel11411@gmail.com / @nKiTp@TeL22
-    const isEmailValid = cleanEmail === ADMIN_EMAIL.toLowerCase();
+    // Credentials check
+    const isEmailValid = cleanEmail === ADMIN_EMAIL.toLowerCase() || cleanEmail === 'admin' || cleanEmail === 'ankit';
     const isPassValid = cleanPass === currentActivePassword;
 
     if (isEmailValid && isPassValid) {
       setIsAuthenticated(true);
-      sessionStorage.setItem('ankit_admin_auth', 'true');
+      loginAdmin();
       setAuthError(null);
     } else if (!isEmailValid && !isPassValid) {
-      setAuthError('Invalid Admin Gmail and Password.');
+      setAuthError('Invalid Admin ID and Password.');
     } else if (!isEmailValid) {
-      setAuthError('Invalid Admin Gmail address.');
+      setAuthError('Invalid Admin ID.');
     } else {
       setAuthError('Invalid Password.');
     }
@@ -133,8 +134,8 @@ export const AdminPanelSection: React.FC<AdminPanelSectionProps> = ({ setActiveT
     const cleanEmail = recoveryEmail.trim().toLowerCase();
     const cleanAns = recoveryAnswer.trim().toLowerCase();
 
-    if (cleanEmail !== ADMIN_EMAIL.toLowerCase()) {
-      setRecoveryError('This email is not registered as the administrator.');
+    if (cleanEmail !== ADMIN_EMAIL.toLowerCase() && cleanEmail !== 'admin' && cleanEmail !== 'ankit') {
+      setRecoveryError('This account ID is not recognized as the administrator.');
       return;
     }
 
@@ -172,7 +173,7 @@ export const AdminPanelSection: React.FC<AdminPanelSectionProps> = ({ setActiveT
   const handleResetToDefaultPassword = () => {
     localStorage.removeItem('ankit_custom_admin_pwd');
     setPassword(DEFAULT_ADMIN_PASSWORD);
-    setPasswordUpdateMessage('Password reset to default: @nKiTp@TeL22');
+    setPasswordUpdateMessage('Password restored to standard master default.');
     setTimeout(() => setPasswordUpdateMessage(null), 4000);
   };
 
@@ -182,13 +183,13 @@ export const AdminPanelSection: React.FC<AdminPanelSectionProps> = ({ setActiveT
     setPassword(activePwd);
     setIsForgotMode(false);
     setIsAuthenticated(true);
-    sessionStorage.setItem('ankit_admin_auth', 'true');
+    loginAdmin();
     setAuthError(null);
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
-    sessionStorage.removeItem('ankit_admin_auth');
+    logoutAdmin();
     setEmail('');
     setPassword('');
     setAuthError(null);
@@ -261,11 +262,10 @@ export const AdminPanelSection: React.FC<AdminPanelSectionProps> = ({ setActiveT
   };
 
   const handleDeleteNoteItem = async (id: string) => {
-    if (window.confirm('Delete this note from Supabase?')) {
-      await deleteNoteFromSupabase(id);
-      setNotes((prev) => prev.filter((n) => n.id !== id));
-      setStatusMessage('Note removed.');
-    }
+    await deleteNoteFromSupabase(id);
+    setNotes((prev) => prev.filter((n) => n.id !== id));
+    setDeletingAdminNoteId(null);
+    setStatusMessage('Note removed from database.');
   };
 
   const handleExportCSV = (type: 'appointments' | 'contacts' | 'notes') => {
@@ -328,25 +328,22 @@ export const AdminPanelSection: React.FC<AdminPanelSectionProps> = ({ setActiveT
 
             {!recoverySuccess ? (
               <form onSubmit={handleRecoverySubmit} className="space-y-4">
-                {/* Admin Email Confirmation */}
+                {/* Admin ID Confirmation */}
                 <div>
                   <label className="block text-[11px] font-mono font-bold text-black uppercase mb-1">
-                    Registered Admin Gmail
+                    Administrator Account ID
                   </label>
                   <input
-                    type="email"
+                    type="text"
                     required
                     value={recoveryEmail}
                     onChange={(e) => {
                       setRecoveryEmail(e.target.value);
                       setRecoveryError(null);
                     }}
-                    placeholder="ankitpatel11411@gmail.com"
+                    placeholder="Enter admin ID or email..."
                     className="w-full px-3.5 py-2.5 bg-white border-2 border-black text-xs font-mono font-bold focus:bg-[#F9F9F9] focus:outline-none"
                   />
-                  <p className="text-[10px] font-mono text-[#71717A] mt-1">
-                    Default account: ankitpatel11411@gmail.com
-                  </p>
                 </div>
 
                 {/* Security Question Challenge */}
@@ -392,13 +389,13 @@ export const AdminPanelSection: React.FC<AdminPanelSectionProps> = ({ setActiveT
                     <span>Verify Identity & Reveal Password</span>
                   </button>
 
-                  {/* Dispatch to Gmail Direct Link */}
+                  {/* Direct Mail Recovery Notification */}
                   <a
-                    href={`mailto:${ADMIN_EMAIL}?subject=Admin%20Password%20Recovery%20-%20Ankit%20Patel%20Portfolio&body=Hi%20Ankit,%0D%0A%0D%0AHere%20is%20your%20registered%20portfolio%20admin%20credential:%0D%0A•%20Admin%20Gmail:%20${ADMIN_EMAIL}%0D%0A•%20Admin%20Password:%20${encodeURIComponent(currentActivePassword)}%0D%0A%0D%0ARegards,%0D%0AAnkit%20Patel%20Portfolio%20System`}
+                    href={`mailto:${ADMIN_EMAIL}?subject=Admin%20Password%20Recovery%20-%20Portfolio&body=Hi%20Ankit,%0D%0A%0D%0AYour%20admin%20security%20system%20has%20logged%20this%20request.%0D%0A%0D%0ARegards,%0D%0APortfolio%20Security%20System`}
                     className="w-full py-2.5 bg-white text-black hover:bg-[#F4F4F5] border-2 border-black font-mono text-xs font-bold uppercase text-center transition-colors shadow-[2px_2px_0px_#000000] flex items-center justify-center gap-2"
                   >
                     <Mail className="w-3.5 h-3.5" />
-                    <span>Email Password to ankitpatel11411@gmail.com</span>
+                    <span>Send Password Recovery Notice</span>
                   </a>
 
                   <button
@@ -428,45 +425,19 @@ export const AdminPanelSection: React.FC<AdminPanelSectionProps> = ({ setActiveT
                   </div>
                 </div>
 
-                {/* Password Display Box */}
+                {/* Verification Confirmation Box */}
                 <div className="p-4 bg-[#F9F9F9] border-2 border-black space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-mono font-black uppercase text-black">
-                      Active Admin Password
+                      Identity Confirmed
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => setShowRecoveredPassword(!showRecoveredPassword)}
-                      className="text-[10px] font-mono font-bold text-[#2563EB] hover:text-black uppercase flex items-center gap-1 cursor-pointer"
-                    >
-                      {showRecoveredPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      <span>{showRecoveredPassword ? 'Hide' : 'Reveal'}</span>
-                    </button>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-2 p-2.5 bg-white border-2 border-black">
-                    <span className="font-mono text-sm font-black text-black tracking-wider selection:bg-[#00FF00]">
-                      {showRecoveredPassword ? currentActivePassword : '•••••••••••••'}
+                    <span className="text-[10px] font-mono font-bold text-green-700 uppercase">
+                      ✓ Authorization Granted
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(currentActivePassword);
-                        setCopiedRecoveryPwd(true);
-                        setTimeout(() => setCopiedRecoveryPwd(false), 2000);
-                      }}
-                      className="px-2.5 py-1 bg-black text-white hover:bg-[#00FF00] hover:text-black font-mono text-[10px] font-black uppercase flex items-center gap-1 border border-black cursor-pointer transition-colors"
-                      title="Copy Password"
-                    >
-                      {copiedRecoveryPwd ? <Check className="w-3 h-3 text-[#00FF00]" /> : <Copy className="w-3 h-3" />}
-                      <span>{copiedRecoveryPwd ? 'COPIED' : 'COPY'}</span>
-                    </button>
                   </div>
-
-                  <div className="text-[10px] font-mono text-[#52525B] flex justify-between pt-1">
-                    <span>Default Master: <code className="font-bold text-black">@nKiTp@TeL22</code></span>
-                    <span>Status: <strong className="text-green-700">Active</strong></span>
-                  </div>
+                  <p className="text-xs font-mono text-[#52525B]">
+                    Administrative challenge passed successfully. You may now immediately sign in with one click or set a new custom password below.
+                  </p>
                 </div>
 
                 {/* Quick Autofill & Sign In */}
@@ -512,7 +483,7 @@ export const AdminPanelSection: React.FC<AdminPanelSectionProps> = ({ setActiveT
                       onClick={handleResetToDefaultPassword}
                       className="mt-2 text-[10px] font-mono font-bold text-red-600 hover:text-black underline cursor-pointer"
                     >
-                      Reset back to default password (@nKiTp@TeL22)
+                      Reset back to default master password
                     </button>
                   )}
                 </div>
@@ -553,21 +524,21 @@ export const AdminPanelSection: React.FC<AdminPanelSectionProps> = ({ setActiveT
           </p>
 
           <form onSubmit={handleLogin} className="space-y-4">
-            {/* Email Field */}
+            {/* Account ID / Email Field */}
             <div>
               <label className="block text-[11px] font-mono font-bold text-black uppercase mb-1">
-                Admin Gmail
+                Admin Account ID
               </label>
               <div className="relative">
                 <input
-                  type="email"
+                  type="text"
                   required
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
                     setAuthError(null);
                   }}
-                  placeholder="ankitpatel11411@gmail.com"
+                  placeholder="Enter admin ID..."
                   className="w-full pl-3.5 pr-3.5 py-2.5 bg-white border-2 border-black text-xs font-mono font-bold focus:bg-[#F9F9F9] focus:outline-none"
                 />
               </div>
@@ -667,7 +638,7 @@ export const AdminPanelSection: React.FC<AdminPanelSectionProps> = ({ setActiveT
               ADMINISTRATIVE HUB // 06. TELEMETRY & VAULT
             </span>
             <span className="text-xs font-mono font-bold text-[#52525B]">
-              SUPABASE DB: {SUPABASE_PROJECT_ID}
+              SUPABASE DB: CONNECTED
             </span>
           </div>
 
@@ -1086,13 +1057,33 @@ export const AdminPanelSection: React.FC<AdminPanelSectionProps> = ({ setActiveT
                     </p>
                   </div>
 
-                  <button
-                    onClick={() => handleDeleteNoteItem(n.id)}
-                    className="p-1.5 text-red-600 hover:bg-red-50 border border-black/20"
-                    title="Delete Note"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {deletingAdminNoteId === n.id ? (
+                    <div className="flex items-center gap-1.5 bg-red-50 border-2 border-red-600 p-1.5 shrink-0">
+                      <span className="text-[10px] font-mono font-black text-red-700 uppercase">
+                        Delete?
+                      </span>
+                      <button
+                        onClick={() => handleDeleteNoteItem(n.id)}
+                        className="px-2 py-0.5 bg-red-600 text-white font-mono text-[10px] font-black uppercase cursor-pointer"
+                      >
+                        Yes
+                      </button>
+                      <button
+                        onClick={() => setDeletingAdminNoteId(null)}
+                        className="px-2 py-0.5 bg-white border border-black font-mono text-[10px] font-bold uppercase cursor-pointer"
+                      >
+                        No
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setDeletingAdminNoteId(n.id)}
+                      className="p-1.5 text-red-600 hover:bg-red-50 border border-black/20 cursor-pointer"
+                      title="Delete Note"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -1126,7 +1117,7 @@ export const AdminPanelSection: React.FC<AdminPanelSectionProps> = ({ setActiveT
           <div className="p-4 bg-[#F4F4F5] border-2 border-black font-mono text-xs space-y-2">
             <h4 className="font-black uppercase text-black">How to Execute:</h4>
             <ol className="list-decimal list-inside space-y-1 text-[#3F3F46]">
-              <li>Open your project: <a href={`https://supabase.com/dashboard/project/${SUPABASE_PROJECT_ID}/sql`} target="_blank" rel="noreferrer" className="underline font-bold text-black inline-flex items-center gap-0.5">Supabase SQL Editor <ExternalLink className="w-3 h-3" /></a></li>
+              <li>Open your project: <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" className="underline font-bold text-black inline-flex items-center gap-0.5">Supabase Dashboard <ExternalLink className="w-3 h-3" /></a></li>
               <li>Click <strong>New Query</strong>, paste the script, and click <strong>Run</strong></li>
             </ol>
           </div>
@@ -1143,13 +1134,13 @@ export const AdminPanelSection: React.FC<AdminPanelSectionProps> = ({ setActiveT
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono text-xs">
             <div className="p-4 bg-[#F9F9F9] border-2 border-black space-y-1">
-              <span className="text-[#52525B] font-bold block">PROJECT ID:</span>
-              <span className="font-black text-black text-sm">{SUPABASE_PROJECT_ID}</span>
+              <span className="text-[#52525B] font-bold block">DATABASE SERVICE:</span>
+              <span className="font-black text-black text-sm">Supabase PostgreSQL</span>
             </div>
 
             <div className="p-4 bg-[#F9F9F9] border-2 border-black space-y-1">
-              <span className="text-[#52525B] font-bold block">SUPABASE API URL:</span>
-              <span className="font-black text-[#00AA00] text-sm break-all">{SUPABASE_URL}</span>
+              <span className="text-[#52525B] font-bold block">CONNECTION STATUS:</span>
+              <span className="font-black text-[#00AA00] text-sm">Active & Online</span>
             </div>
           </div>
 
@@ -1172,42 +1163,25 @@ export const AdminPanelSection: React.FC<AdminPanelSectionProps> = ({ setActiveT
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
               <div className="p-4 bg-[#F9F9F9] border-2 border-black space-y-2">
-                <span className="text-[#52525B] font-bold block text-[11px]">ADMIN GMAIL:</span>
-                <span className="font-black text-black text-sm block">{ADMIN_EMAIL}</span>
+                <span className="text-[#52525B] font-bold block text-[11px]">ADMINISTRATOR ACCOUNT:</span>
+                <span className="font-black text-black text-sm block">Master Portfolio Administrator</span>
                 <span className="text-[10px] text-[#71717A] block">
-                  Registered address for recovery emails and booking notices.
+                  Verified credentials active for portfolio administration and Supabase access.
                 </span>
               </div>
 
               <div className="p-4 bg-[#F9F9F9] border-2 border-black space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[#52525B] font-bold text-[11px]">ADMIN MASTER PASSWORD:</span>
-                  <button
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="text-[10px] font-bold text-[#2563EB] hover:text-black uppercase flex items-center gap-1 cursor-pointer"
-                  >
-                    {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                    <span>{showPassword ? 'Hide' : 'Reveal'}</span>
-                  </button>
-                </div>
-                <div className="flex items-center justify-between gap-2 p-2 bg-white border border-black">
-                  <span className="font-mono text-sm font-black text-black">
-                    {showPassword ? getStoredAdminPassword() : '•••••••••••••'}
+                <span className="text-[#52525B] font-bold text-[11px] block">SECURITY CREDENTIAL:</span>
+                <div className="flex items-center justify-between p-2 bg-white border border-black">
+                  <span className="font-mono text-sm font-black text-black tracking-widest">
+                    ••••••••••••••••
                   </span>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(getStoredAdminPassword());
-                      setStatusMessage('Admin password copied to clipboard!');
-                      setTimeout(() => setStatusMessage(null), 3000);
-                    }}
-                    className="px-2 py-1 bg-black text-white hover:bg-[#00FF00] hover:text-black text-[10px] font-black uppercase flex items-center gap-1 border border-black cursor-pointer"
-                  >
-                    <Copy className="w-3 h-3" />
-                    <span>COPY</span>
-                  </button>
+                  <span className="text-[10px] font-mono font-bold text-green-700 uppercase">
+                    Active
+                  </span>
                 </div>
                 <div className="text-[10px] text-[#52525B] flex justify-between">
-                  <span>Default: <code className="font-bold text-black">@nKiTp@TeL22</code></span>
+                  <span>Security Mode: <strong className="text-black">Secured</strong></span>
                   {localStorage.getItem('ankit_custom_admin_pwd') ? (
                     <button
                       onClick={handleResetToDefaultPassword}

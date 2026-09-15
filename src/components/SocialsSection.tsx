@@ -28,14 +28,20 @@ import {
   Send,
   X,
   Save,
+  Lock,
 } from 'lucide-react';
 import { NavigationTab } from '../types';
+import { useAdminAuth } from '../utils/adminAuth';
+import { AdminAuthModal } from './AdminAuthModal';
 
 interface SocialsSectionProps {
   setActiveTab: (tab: NavigationTab) => void;
 }
 
 export const SocialsSection: React.FC<SocialsSectionProps> = ({ setActiveTab }) => {
+  const { isAdmin } = useAdminAuth();
+  const [isAdminAuthModalOpen, setIsAdminAuthModalOpen] = useState(false);
+  const [isResetConfirming, setIsResetConfirming] = useState(false);
   const [socials, setSocials] = useState<SocialLinkItem[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isEditingModalOpen, setIsEditingModalOpen] = useState(false);
@@ -53,8 +59,12 @@ export const SocialsSection: React.FC<SocialsSectionProps> = ({ setActiveTab }) 
   };
 
   const handleOpenEditModal = () => {
-    setEditList(JSON.parse(JSON.stringify(socials)));
-    setIsEditingModalOpen(true);
+    if (isAdmin) {
+      setEditList(JSON.parse(JSON.stringify(socials)));
+      setIsEditingModalOpen(true);
+    } else {
+      setIsAdminAuthModalOpen(true);
+    }
   };
 
   const handleSaveEdits = () => {
@@ -64,12 +74,11 @@ export const SocialsSection: React.FC<SocialsSectionProps> = ({ setActiveTab }) 
   };
 
   const handleResetDefaults = () => {
-    if (window.confirm('Reset all social links to default settings?')) {
-      setSocials(DEFAULT_SOCIAL_LINKS);
-      saveSocials(DEFAULT_SOCIAL_LINKS);
-      setEditList(DEFAULT_SOCIAL_LINKS);
-      setIsEditingModalOpen(false);
-    }
+    setSocials(DEFAULT_SOCIAL_LINKS);
+    saveSocials(DEFAULT_SOCIAL_LINKS);
+    setEditList(DEFAULT_SOCIAL_LINKS);
+    setIsResetConfirming(false);
+    setIsEditingModalOpen(false);
   };
 
   const handleUpdateItem = (index: number, field: keyof SocialLinkItem, value: string) => {
@@ -162,8 +171,9 @@ export const SocialsSection: React.FC<SocialsSectionProps> = ({ setActiveTab }) 
           <button
             onClick={handleOpenEditModal}
             className="px-4 py-2.5 bg-black hover:bg-[#00FF00] hover:text-black text-white border-2 border-black text-xs font-mono font-black flex items-center gap-2 transition-all shadow-[4px_4px_0px_#000000] cursor-pointer"
+            title={isAdmin ? 'Customize social media and community links' : 'Requires admin authorization to customize links'}
           >
-            <Edit3 className="w-3.5 h-3.5" />
+            {!isAdmin ? <Lock className="w-3.5 h-3.5 text-[#A1A1AA]" /> : <Edit3 className="w-3.5 h-3.5" />}
             <span>EDIT / CUSTOMIZE LINKS</span>
           </button>
         </div>
@@ -216,7 +226,11 @@ export const SocialsSection: React.FC<SocialsSectionProps> = ({ setActiveTab }) 
 
               {/* Handle Box */}
               <div className="p-2.5 bg-[#F9F9F9] border-2 border-black flex items-center justify-between mb-3">
-                <span className="font-mono text-xs font-bold text-black truncate">{item.handle}</span>
+                <span className="font-mono text-xs font-bold text-black truncate">
+                  {item.handle && (item.handle.toLowerCase().includes('@gmail.com') || item.handle.includes('ankitpatel11411'))
+                    ? 'Official Direct Channel'
+                    : item.handle}
+                </span>
                 <button
                   onClick={() => handleCopyHandle(item)}
                   className="p-1 hover:bg-black hover:text-white border border-black transition-colors cursor-pointer text-xs shrink-0"
@@ -356,13 +370,33 @@ export const SocialsSection: React.FC<SocialsSectionProps> = ({ setActiveTab }) 
 
             {/* Modal Footer Actions */}
             <div className="p-6 border-t-2 border-black bg-[#F9F9F9] flex flex-wrap items-center justify-between gap-4">
-              <button
-                onClick={handleResetDefaults}
-                className="px-4 py-2 bg-white hover:bg-red-50 text-red-600 border-2 border-red-600 font-mono text-xs font-black uppercase flex items-center gap-1.5 cursor-pointer"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>RESET ALL DEFAULTS</span>
-              </button>
+              {isResetConfirming ? (
+                <div className="flex items-center gap-2 bg-red-50 border-2 border-red-600 p-1.5 animate-fadeIn">
+                  <span className="text-[10px] font-mono font-black text-red-700 uppercase">
+                    Reset all links to defaults?
+                  </span>
+                  <button
+                    onClick={handleResetDefaults}
+                    className="px-2.5 py-1 bg-red-600 hover:bg-black text-white font-mono text-[10px] font-black uppercase cursor-pointer"
+                  >
+                    Yes, Reset
+                  </button>
+                  <button
+                    onClick={() => setIsResetConfirming(false)}
+                    className="px-2 py-1 bg-white hover:bg-gray-100 border border-black font-mono text-[10px] font-bold uppercase cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setIsResetConfirming(true)}
+                  className="px-4 py-2 bg-white hover:bg-red-50 text-red-600 border-2 border-red-600 font-mono text-xs font-black uppercase flex items-center gap-1.5 cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>RESET ALL DEFAULTS</span>
+                </button>
+              )}
 
               <div className="flex items-center gap-3">
                 <button
@@ -383,6 +417,17 @@ export const SocialsSection: React.FC<SocialsSectionProps> = ({ setActiveTab }) 
           </div>
         </div>
       )}
+      {/* Admin Authentication Modal */}
+      <AdminAuthModal
+        isOpen={isAdminAuthModalOpen}
+        onClose={() => setIsAdminAuthModalOpen(false)}
+        onSuccess={() => {
+          setIsAdminAuthModalOpen(false);
+          setEditList(JSON.parse(JSON.stringify(socials)));
+          setIsEditingModalOpen(true);
+        }}
+        actionDescription="customize or reorder portfolio social channels"
+      />
     </section>
   );
 };

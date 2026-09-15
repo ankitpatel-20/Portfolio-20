@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { NavigationTab } from '../types';
-import { Terminal, Code, Menu, X, Sparkles, User, Briefcase, Video } from 'lucide-react';
+import { Terminal, Code, Menu, X, Sparkles, User, Briefcase, Video, Lock, ShieldCheck } from 'lucide-react';
+import { useAdminAuth } from '../utils/adminAuth';
 
 interface NavbarProps {
   activeTab: NavigationTab;
@@ -17,6 +18,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleTerminal,
   onOpenMeet,
 }) => {
+  const { isAdmin } = useAdminAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const tabs: { id: NavigationTab; label: string }[] = [
@@ -103,6 +105,31 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Right Action Icons & Recruiter Trigger */}
         <div className="flex items-center gap-2 sm:gap-3 pb-0.5">
+          {/* Admin Mode Badge / Access */}
+          <button
+            id="nav-admin-badge-btn"
+            onClick={() => handleTabClick('admin')}
+            title={isAdmin ? 'Admin Console Active (Ankit Patel)' : 'Admin Login (Ankit Patel)'}
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 border-2 border-black font-mono text-[10px] font-black tracking-wider transition-all shadow-[2px_2px_0px_#000000] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none cursor-pointer ${
+              isAdmin
+                ? 'bg-[#00FF00] text-black'
+                : 'bg-white hover:bg-black hover:text-white text-black'
+            }`}
+          >
+            {isAdmin ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-black animate-pulse" />
+                <span className="hidden sm:inline">ADMIN ACTIVE</span>
+                <span className="sm:hidden">ADMIN</span>
+              </>
+            ) : (
+              <>
+                <Lock className="w-3 h-3 text-[#52525B]" />
+                <span className="hidden sm:inline">ADMIN</span>
+              </>
+            )}
+          </button>
+
           {/* Google Meet Trigger */}
           {onOpenMeet && (
             <button
@@ -182,6 +209,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span>GOOGLE MEET MANAGER</span>
               </button>
             )}
+            <button
+              id="mobile-nav-admin-btn"
+              onClick={() => handleTabClick('admin')}
+              className={`w-full py-2.5 text-xs font-mono font-black tracking-widest uppercase border-2 border-black text-center shadow-[3px_3px_0px_#000000] flex items-center justify-center gap-2 ${
+                isAdmin
+                  ? 'bg-[#00FF00] text-black'
+                  : 'bg-white text-black hover:bg-black hover:text-white'
+              }`}
+            >
+              {isAdmin ? <ShieldCheck className="w-4 h-4 text-black" /> : <Lock className="w-4 h-4 text-[#52525B]" />}
+              <span>{isAdmin ? 'ADMIN CONSOLE (AUTHENTICATED)' : 'ADMIN CONSOLE LOGIN'}</span>
+            </button>
             <button
               onClick={() => {
                 setMobileMenuOpen(false);

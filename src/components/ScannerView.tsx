@@ -20,7 +20,7 @@ import {
   Minimize2,
   ExternalLink,
 } from 'lucide-react';
-import { saveContactMessageToSupabase, SUPABASE_PROJECT_ID } from '../lib/supabase';
+import { saveContactMessageToSupabase } from '../lib/supabase';
 import { PERSONAL_INFO } from '../data/portfolioData';
 
 export interface RecentScanItem {
@@ -70,7 +70,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
       {
         id: 'scan-ankit-init',
         name: 'ANKIT PATEL',
-        email: 'ankitpatel11411@gmail.com',
+        email: 'Verified Enrolled Student',
         college: 'AMITY UNIVERSITY ONLINE',
         course: 'BCA (Bachelor of Computer Applications)',
         duration: '2024 - 2027',
@@ -177,7 +177,7 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
     const resultPayload: RecentScanItem = {
       id: `scan-${Date.now()}`,
       name: 'ANKIT PATEL',
-      email: 'ankitpatel11411@gmail.com',
+      email: 'Verified Enrolled Student',
       college: 'AMITY UNIVERSITY ONLINE',
       course: 'BCA (Bachelor of Computer Applications)',
       duration: '2024 - 2027',
@@ -454,8 +454,8 @@ export const ScannerView: React.FC<ScannerViewProps> = ({
               </div>
 
               <div className="flex justify-between border-b border-gray-200 pb-1">
-                <span className="text-[#64748B] font-bold">MAIL:</span>
-                <span className="font-black text-black">{scannedResult.email}</span>
+                <span className="text-[#64748B] font-bold">STATUS:</span>
+                <span className="font-black text-black">Verified Enrolled Student</span>
               </div>
 
               <div className="flex justify-between border-b border-gray-200 pb-1">
